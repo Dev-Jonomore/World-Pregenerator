@@ -1,0 +1,4 @@
+name: World Pregenerator
+version: '1.0-SNAPSHOT'
+main: mc.jonomore.worldPregenerator.WorldPregenerator
+api-version: '1.21'
