@@ -3,6 +3,7 @@ package mc.jonomore.worldPregenerator;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.util.ArrayList;
 
 public final class WorldPregenerator extends JavaPlugin {
@@ -17,6 +18,10 @@ public final class WorldPregenerator extends JavaPlugin {
     else {
       running = true;
       // TODO: read seeds (method), loop through worlds
+      ArrayList<Long> seeds = readSeeds();
+      if (!seeds.empty()) {
+        // TODO: loop through seeds
+      }
     }
   }
 
@@ -25,14 +30,17 @@ public final class WorldPregenerator extends JavaPlugin {
     // TODO: cleanup
   }
 
-  private ArrayList<long> readSeeds() {
-    ArrayList<long> seeds;
+  private ArrayList<Long> readSeeds() {
+    ArrayList<Long> seeds = new ArrayList<Long>();
     try {
-      java.uitl.Scanner scanner = new java.util.Scanner(new File(config.getSeedsFile()))
+      java.uitl.Scanner scanner = new java.util.Scanner(new File(config.getSeedsFile()));
       while (scanner.hasNextLine()) {
-        seeds.add(scanner.getLong())
+        seeds.add(scanner.getLong());
       }
+    } catch (FileNotFoundException e) {
+      getLogger().severe("Seeds file not found: " + e.getMessage());
     }
+    return seeds;
   }
 
   @Override
