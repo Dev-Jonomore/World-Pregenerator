@@ -15,7 +15,7 @@ public class ConfigManager {
   }
 
   public void loadConfig() {
-    radius = plugin.getConfig().getInt("radius");
+    radius = plugin.getConfig().getInt("generation-radius");
     exportPath = plugin.getConfig().getString("export-path");
     seedsFile = plugin.getConfig().getString("seeds-file");
   }

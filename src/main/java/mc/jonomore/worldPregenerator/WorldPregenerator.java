@@ -19,23 +19,23 @@ public final class WorldPregenerator extends JavaPlugin {
       running = true;
       // TODO: read seeds (method), loop through worlds
       ArrayList<Long> seeds = readSeeds();
-      if (!seeds.empty()) {
+      if (!seeds.isEmpty()) {
         // TODO: loop through seeds
       }
     }
   }
 
   public void stop() {
-    running = stop;
+    running = false;
     // TODO: cleanup
   }
 
   private ArrayList<Long> readSeeds() {
     ArrayList<Long> seeds = new ArrayList<Long>();
     try {
-      java.uitl.Scanner scanner = new java.util.Scanner(new File(config.getSeedsFile()));
+      java.util.Scanner scanner = new java.util.Scanner(new File(config.getSeedsFile()));
       while (scanner.hasNextLine()) {
-        seeds.add(scanner.getLong());
+        seeds.add(scanner.nextLong());
       }
     } catch (FileNotFoundException e) {
       getLogger().severe("Seeds file not found: " + e.getMessage());
