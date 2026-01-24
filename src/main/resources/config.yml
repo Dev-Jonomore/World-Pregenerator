@@ -1,3 +1,10 @@
 generation-radius: 3000
 export-path: "/mnt/hgfs/Worlds"
 seeds-file: "/mnt/hgfs/Seeds/seeds.txt"
+spawn-adjustment:
+  maxSearchRadius: 100
+  maxVerticalScan: 128
+cage-building:
+  cage-material: PURPLE_STAINED_GLASS
+  cage-radius: 4
+  cage-height: 3

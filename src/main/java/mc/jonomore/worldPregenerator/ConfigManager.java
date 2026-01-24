@@ -1,12 +1,21 @@
 package mc.jonomore.worldPregenerator;
 
+import org.bukkit.Material;
+
+import java.util.Objects;
+
 public class ConfigManager {
   private final WorldPregenerator plugin;
 
   // Cached config values
-  private int radius;
+  private int generation_radius;
   private String exportPath;
   private String seedsFile;
+  private int maxSearchRadius;
+  private int maxVerticalScan;
+  private Material cage_material;
+  private int cage_radius;
+  private int cage_height;
 
   public ConfigManager(WorldPregenerator plugin) {
     this.plugin = plugin;
@@ -15,13 +24,23 @@ public class ConfigManager {
   }
 
   public void loadConfig() {
-    radius = plugin.getConfig().getInt("generation-radius");
+    generation_radius = plugin.getConfig().getInt("generation-radius");
     exportPath = plugin.getConfig().getString("export-path");
     seedsFile = plugin.getConfig().getString("seeds-file");
+    maxSearchRadius = plugin.getConfig().getInt("spawn-adjustment.maxSearchRadius");
+    maxVerticalScan = plugin.getConfig().getInt("spawn-adjustment.maxVerticalScan");
+    cage_material = Material.getMaterial(
+        Objects.requireNonNull(
+            plugin.getConfig()
+            .getString("cage-building.cage-material")
+        )
+    );
+    cage_radius = plugin.getConfig().getInt("cage-building.cage-radius");
+    cage_height = plugin.getConfig().getInt("cage-building.cage-height");
   }
 
   public int getRadius() {
-    return radius;
+    return generation_radius;
   }
 
   public String getExportPath() {
@@ -31,4 +50,14 @@ public class ConfigManager {
   public String getSeedsFile() {
     return seedsFile;
   }
+
+  public int getMaxSearchRadius() { return maxSearchRadius; }
+
+  public int getMaxVerticalScan() { return maxVerticalScan; }
+
+  public Material getCageMaterial() { return cage_material; }
+
+  public int getCageRadius() { return cage_radius; }
+
+  public int getCageHeight() { return cage_height; }
 }
