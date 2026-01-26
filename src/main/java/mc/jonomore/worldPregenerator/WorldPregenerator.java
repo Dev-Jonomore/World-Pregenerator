@@ -1,37 +1,54 @@
 package mc.jonomore.worldPregenerator;
 
 import org.bukkit.plugin.java.JavaPlugin;
+import org.popcraft.chunky.api.ChunkyAPI;
 
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.util.ArrayList;
+import java.util.List;
 
 public final class WorldPregenerator extends JavaPlugin {
 
-  private ConfigManager config;
-  private boolean running = false;
+  ConfigManager config;
+  boolean running = false;
+  private GenerationTask task = null;
 
   public void start() {
     if (running) {
-      this.getLogger().warning("Generation already running!");
+      getLogger().warning("Generation already running!");
     }
     else {
-      running = true;
-      // TODO: read seeds (method), loop through worlds
-      ArrayList<Long> seeds = readSeeds();
+      List<Long> seeds = readSeeds();
       if (!seeds.isEmpty()) {
-        // TODO: loop through seeds
+        ChunkyAPI chunky = getServer().getServicesManager().load(ChunkyAPI.class);
+        if (chunky != null) {
+          running = true;
+          task = new GenerationTask(this, seeds, chunky);
+          task.start();
+        } else {
+          getLogger().severe("Chunky API not found! Make sure Chunky plugin is installed.");
+        }
+      } else {
+        getLogger().warning("No seeds found in file!");
       }
     }
   }
 
   public void stop() {
-    running = false;
-    // TODO: cleanup
+    if (!running) {
+      getLogger().warning("No generation is running!");
+    } else {
+      running = false;
+      if (task != null) {
+        task.stop();
+        task = null;
+      }
+    }
   }
 
-  private ArrayList<Long> readSeeds() {
-    ArrayList<Long> seeds = new ArrayList<Long>();
+  private List<Long> readSeeds() {
+    List<Long> seeds = new ArrayList<>();
     try {
       java.util.Scanner scanner = new java.util.Scanner(new File(config.getSeedsFile()));
       while (scanner.hasNextLine()) {
@@ -40,17 +57,23 @@ public final class WorldPregenerator extends JavaPlugin {
     } catch (FileNotFoundException e) {
       getLogger().severe("Seeds file not found: " + e.getMessage());
     }
+    getLogger().info("Loaded " + seeds.size() + " seeds from file");
     return seeds;
   }
 
   @Override
   public void onEnable() {
-    // Plugin startup logic
     config = new ConfigManager(this);
+    getLogger().info("WorldPregenerator enabled!");
   }
 
   @Override
   public void onDisable() {
-    // Plugin shutdown logic
+    if (running && task != null) {
+      getLogger().info("Stopping generation due to plugin disable...");
+      task.stop();
+      task = null;
+      running = false;
+    }
   }
 }

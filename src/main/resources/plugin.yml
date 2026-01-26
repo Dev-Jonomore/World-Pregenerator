@@ -4,8 +4,3 @@ main: mc.jonomore.worldPregenerator.WorldPregenerator
 api-version: '1.21'
 depend:
   - Chunky
-commands:
-  pregenerate:
-    description: Run the pregeneration
-    usage: /pregenerate
-    aliases: [pregen, gen, pg]
