@@ -25,6 +25,7 @@ public final class WorldPregenerator extends JavaPlugin {
         if (chunky != null) {
           running = true;
           task = new GenerationTask(this, seeds, chunky);
+          task.start();
         } else {
           getLogger().severe("Chunky API not found! Make sure Chunky plugin is installed.");
         }

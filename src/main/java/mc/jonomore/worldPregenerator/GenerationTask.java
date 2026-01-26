@@ -48,8 +48,17 @@ public class GenerationTask {
 
   public void start() {
     interrupted = false;
-    currentIndex = 0;
-    logger.info("Starting world generation for " + seeds.size() + " seeds");
+
+    if (currentIndex == 0) {
+      logger.info("Starting world generation for " + seeds.size() + " seeds");
+    } else if (currentIndex < seeds.size()) {
+      logger.info("Resuming world generation at seed " + (currentIndex + 1) + " of " + seeds.size());
+    } else {
+      logger.info("All worlds already generated!");
+      plugin.running = false;
+      return;
+    }
+
     processNext();
   }
 
@@ -68,6 +77,12 @@ public class GenerationTask {
     }
 
     logger.info("World generation stopped at index " + currentIndex);
+  }
+
+  public void reset() {
+    stop();
+    currentIndex = 0;
+    logger.info("Generation progress reset");
   }
 
   public boolean isRunning() {
@@ -90,11 +105,11 @@ public class GenerationTask {
       World world = createWorld(seed);
       currentWorldName = world.getName();
 
-      generateWorldChunks(world, () -> {
+      generateChunks(world, () -> {
         if (interrupted) return;
 
         try {
-          adjustSpawn(world);
+          checkSpawn(world);
           buildCage(world);
 
           saveAndExportWorld(world, () -> {
@@ -102,25 +117,22 @@ public class GenerationTask {
 
             unloadAndDeleteWorld(world);
             currentWorldName = null;
-            currentIndex++;
-            scheduledTask = Bukkit.getScheduler().runTaskLater(plugin, this::processNext, 40L);
+            moveOn();
           });
 
         } catch (Exception e) {
-          logger.severe("Error in post-generation steps for seed " + seed + ": " + e.getMessage());
-          logger.log(java.util.logging.Level.SEVERE, "Stack trace:", e);
-          handleError();
+          logger.log(java.util.logging.Level.SEVERE, "Error in post-generation steps for seed " + seed, e);
+          moveOn();
         }
       });
 
     } catch (Exception e) {
-      logger.severe("Error creating/generating world for seed " + seed + ": " + e.getMessage());
-      logger.log(java.util.logging.Level.SEVERE, "Stack trace:", e);
-      handleError();
+      logger.log(java.util.logging.Level.SEVERE, "Error creating/generating world for seed " + seed, e);
+      moveOn();
     }
   }
 
-  private void handleError() {
+  private void moveOn() {
     currentIndex++;
     scheduledTask = Bukkit.getScheduler().runTaskLater(plugin, this::processNext, 40L);
   }
@@ -136,12 +148,19 @@ public class GenerationTask {
     return world;
   }
 
-  private void generateWorldChunks(World world, Runnable onComplete) {
+  private void generateChunks(World world, Runnable onComplete) {
     int radius = config.getRadius();
 
     if (chunky.version() == 0) {
       logger.info("Starting chunk generation (radius: " + radius + ")");
-      chunky.startTask(world.getName(), "square", 0, 0, radius, radius, "concentric");
+      chunky.startTask(
+          world.getName(),
+          "square",
+          world.getSpawnLocation().getX(),
+          world.getSpawnLocation().getZ(),
+          radius,
+          radius,
+          "concentric");
 
       chunky.onGenerationComplete(event -> {
         if (event.world().equals(world.getName())) {
@@ -155,17 +174,19 @@ public class GenerationTask {
     }
   }
 
-  private void adjustSpawn(World world) {
-    Location safeSpawn = spawnAdjuster.findSafeSpawn(world);
+  private void checkSpawn(World world) {
+    if (!SpawnAdjuster.isSafeSpawn(world.getSpawnLocation())) {
+      Location safeSpawn = spawnAdjuster.findSafeSpawn(world);
 
-    if (safeSpawn != null) {
-      world.setSpawnLocation(safeSpawn);
-      logger.info("Spawn adjusted to: " +
-          safeSpawn.getBlockX() + ", " +
-          safeSpawn.getBlockY() + ", " +
-          safeSpawn.getBlockZ());
-    } else {
-      logger.warning("Could not find safe spawn location, using default");
+      if (safeSpawn != null) {
+        world.setSpawnLocation(safeSpawn);
+        logger.info("Spawn adjusted to: " +
+            safeSpawn.getBlockX() + ", " +
+            safeSpawn.getBlockY() + ", " +
+            safeSpawn.getBlockZ());
+      } else {
+        logger.warning("Could not find safe spawn location, using default");
+      }
     }
   }
 
@@ -178,36 +199,34 @@ public class GenerationTask {
     world.save();
     logger.info("World saved: " + world.getName());
 
-    File worldFolder = world.getWorldFolder();
-    File exportFolder = new File(config.getExportPath(), world.getName());
-
     Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
       try {
+        File worldFolder = world.getWorldFolder();
+        File exportFolder = new File(config.getExportPath(), world.getName());
         copyDirectory(worldFolder, exportFolder);
         logger.info("World exported to: " + exportFolder);
         Bukkit.getScheduler().runTask(plugin, onComplete);
       } catch (IOException e) {
-        logger.severe("Failed to export world: " + e.getMessage());
-        logger.log(java.util.logging.Level.SEVERE, "Stack trace:", e);
+        logger.log(java.util.logging.Level.SEVERE, "Failed to export world", e);
         Bukkit.getScheduler().runTask(plugin, onComplete);
       }
     });
   }
 
-  private void copyDirectory(File source, File destination) throws IOException {
-    if (!destination.exists()) {
-      destination.mkdirs();
+  private void copyDirectory(File src, File dst) throws IOException {
+    if (!dst.exists()) {
+      dst.mkdirs();
     }
 
-    File[] files = source.listFiles();
+    File[] files = src.listFiles();
     if (files != null) {
       for (File file : files) {
-        File destFile = new File(destination, file.getName());
+        File dstFile = new File(dst, file.getName());
 
         if (file.isDirectory()) {
-          copyDirectory(file, destFile);
+          copyDirectory(file, dstFile);
         } else {
-          Files.copy(file.toPath(), destFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
+          Files.copy(file.toPath(), dstFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
         }
       }
     }
@@ -225,13 +244,12 @@ public class GenerationTask {
         deleteDirectory(worldFolder);
         logger.info("World folder deleted: " + worldName);
       } catch (IOException e) {
-        logger.severe("Failed to delete world folder: " + e.getMessage());
-        logger.log(java.util.logging.Level.SEVERE, "Stack trace:", e);
+        logger.log(java.util.logging.Level.SEVERE, "Failed to delete world folder", e);
       }
     });
   }
 
-  private void deleteDirectory(File directory) throws IOException {
+  static void deleteDirectory(File directory) throws IOException {
     if (directory.exists()) {
       File[] files = directory.listFiles();
       if (files != null) {
