@@ -12,7 +12,7 @@ public final class WorldPregenerator extends JavaPlugin {
 
   ConfigManager config;
   boolean running = false;
-  private GenerationTask task = null;
+  GenerationTask task = null;
 
   public void start() {
     if (running) {
