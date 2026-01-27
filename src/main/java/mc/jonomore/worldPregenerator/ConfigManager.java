@@ -61,4 +61,18 @@ public class ConfigManager {
   public int getCageRadius() { return cage_radius; }
 
   public int getCageHeight() { return cage_height; }
+
+  @Override
+  public String toString() {
+    return "generation-radius: " + generation_radius + "\n" +
+        "export-path: " + exportPath + "\n" +
+        "seeds-file: " + seedsFile + "\n" +
+        "spawn-adjustment:\n" +
+        "  maxSearchRadius: " + maxSearchRadius + "\n" +
+        "  maxVerticalScan: " + maxVerticalScan + "\n" +
+        "cage-building:\n" +
+        "  cage-material: " + cage_material + "\n" +
+        "  cage-radius: " + cage_radius + "\n" +
+        "  cage-height: " + cage_height;
+  }
 }
