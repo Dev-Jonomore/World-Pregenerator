@@ -1,5 +1,6 @@
 package mc.jonomore.worldPregenerator;
 
+import io.papermc.paper.plugin.lifecycle.event.types.LifecycleEvents;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.popcraft.chunky.api.ChunkyAPI;
 
@@ -64,6 +65,10 @@ public final class WorldPregenerator extends JavaPlugin {
   @Override
   public void onEnable() {
     config = new ConfigManager(this);
+    this.getLifecycleManager().registerEventHandler(
+        LifecycleEvents.COMMANDS,
+        commands -> commands.registrar().register(WPCommands.createCommand(this))
+    );
     getLogger().info("WorldPregenerator enabled!");
   }
 
