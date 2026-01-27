@@ -1,6 +1,7 @@
 package mc.jonomore.worldPregenerator;
 
 import io.papermc.paper.plugin.lifecycle.event.types.LifecycleEvents;
+import io.papermc.paper.plugin.lifecycle.event.types.LifecycleEvents;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.popcraft.chunky.api.ChunkyAPI;
 
