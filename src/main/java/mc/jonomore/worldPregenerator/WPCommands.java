@@ -9,12 +9,13 @@ import io.papermc.paper.command.brigadier.Commands;
 import io.papermc.paper.util.Tick;
 import net.kyori.adventure.text.minimessage.MiniMessage;
 import org.bukkit.Bukkit;
+import org.bukkit.scheduler.BukkitTask;
 
 import java.io.File;
 import java.io.IOException;
 
 public class WPCommands {
-  private static boolean reset_window = false;
+  private static BukkitTask reset_timer = null;
 
   public static LiteralCommandNode<CommandSourceStack> createCommand(WorldPregenerator wp) {
     return Commands.literal("worldpregenerator")
@@ -42,13 +43,10 @@ public class WPCommands {
                   )
               );
 
-              // open reset window
-              reset_window = true;
-
-              // set a 30-second timer before reset window expires
-              Bukkit.getScheduler().runTaskLater(
+              if (reset_timer != null) reset_timer.cancel();
+              reset_timer = Bukkit.getScheduler().runTaskLater(
                   wp,
-                  () -> reset_window = false,
+                  () -> reset_timer = null,
                   Tick.tick().fromDuration(java.time.Duration.ofSeconds(30L))
               );
 
@@ -89,7 +87,7 @@ public class WPCommands {
   }
 
   private static int hardReset(CommandContext<CommandSourceStack> ctx, WorldPregenerator wp) {
-    if (!reset_window) {
+    if (reset_timer == null || reset_timer.isCancelled()) {
       ctx.getSource().getSender().sendMessage(
           MiniMessage.miniMessage().deserialize(
               "Reset window has expired or was never opened!"
@@ -119,33 +117,37 @@ public class WPCommands {
     }
 
     ctx.getSource().getSender().sendMessage("Deleting " + worlds.length + " worlds...");
-    for (File world_folder : worlds) {
-      try {
-        util.deleteDirectory(world_folder);
-      } catch (IOException e) {
-        ctx.getSource().getSender().sendMessage(
-            MiniMessage.miniMessage().deserialize(
-                "<red>[ERROR] Failed to delete world folder. " + e.getMessage()
-            )
-        );
+    Bukkit.getScheduler().runTaskAsynchronously(wp, () -> {
+      for (File world_folder : worlds) {
+        try {
+          util.deleteDirectory(world_folder);
+        } catch (IOException e) {
+          ctx.getSource().getSender().sendMessage(
+              MiniMessage.miniMessage().deserialize(
+                  "<red>[ERROR] Failed to delete world folder. " + e.getMessage()
+              )
+          );
+        }
       }
-    }
 
-    File[] remaining_worlds = world_dir.listFiles();
-    if (remaining_worlds != null && remaining_worlds.length != 0) {
-      ctx.getSource().getSender().sendMessage(
-          MiniMessage.miniMessage().deserialize(
-              "<yellow>[WARNING] there are still <dark_red>" +
-                  remaining_worlds.length + "</dark_red> worlds in your world directory."
-          )
-      );
-    } else {
-      ctx.getSource().getSender().sendMessage(
-          MiniMessage.miniMessage().deserialize(
-              "<green>All worlds successfully deleted!"
-          )
-      );
-    }
+      Bukkit.getScheduler().runTask(wp, () -> {
+        File[] remaining_worlds = world_dir.listFiles();
+        if (remaining_worlds != null && remaining_worlds.length != 0) {
+          ctx.getSource().getSender().sendMessage(
+              MiniMessage.miniMessage().deserialize(
+                  "<yellow>[WARNING] there are still <dark_red>" +
+                      remaining_worlds.length + "</dark_red> worlds in your world directory."
+              )
+          );
+        } else {
+          ctx.getSource().getSender().sendMessage(
+              MiniMessage.miniMessage().deserialize(
+                  "<green>All worlds successfully deleted!"
+              )
+          );
+        }
+      });
+    });
 
     wp.task.reset();
     return Command.SINGLE_SUCCESS;
