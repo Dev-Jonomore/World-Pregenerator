@@ -52,7 +52,7 @@ public final class WorldPregenerator extends JavaPlugin {
     List<Long> seeds = new ArrayList<>();
     try {
       java.util.Scanner scanner = new java.util.Scanner(new File(config.getSeedsFile()));
-      while (scanner.hasNextLine()) {
+      while (scanner.hasNextLong()) {
         seeds.add(scanner.nextLong());
       }
     } catch (FileNotFoundException e) {
