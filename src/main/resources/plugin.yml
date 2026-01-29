@@ -1,5 +1,5 @@
-name: World Pregenerator
-version: '1.0-SNAPSHOT'
+name: World-Pregenerator
+version: '1.0'
 main: mc.jonomore.worldPregenerator.WorldPregenerator
 api-version: '1.21'
 depend:
