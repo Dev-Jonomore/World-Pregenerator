@@ -1,4 +1,4 @@
-generation-radius: 3000
+generation-radius: 1200
 export-path: "/mnt/hgfs/Worlds"
 seeds-file: "/mnt/hgfs/Seeds/seeds.txt"
 spawn-adjustment:
