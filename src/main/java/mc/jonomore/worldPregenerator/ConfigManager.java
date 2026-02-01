@@ -30,12 +30,16 @@ public class ConfigManager {
     seedsFile = plugin.getConfig().getString("seeds-file");
     maxSearchRadius = plugin.getConfig().getInt("spawn-adjustment.maxSearchRadius");
     maxVerticalScan = plugin.getConfig().getInt("spawn-adjustment.maxVerticalScan");
-    cage_material = Material.getMaterial(
-        Objects.requireNonNull(
-            plugin.getConfig()
-            .getString("cage-building.cage-material")
-        )
-    );
+
+    String cageMaterialName = plugin.getConfig().getString("cage-building.cage-material", "PURPLE_STAINED_GLASS");
+    Material parsedMaterial = Material.getMaterial(cageMaterialName);
+    if (parsedMaterial == null) {
+      plugin.getLogger().warning("Invalid cage material: '" + cageMaterialName + "'. Defaulting to 'PURPLE_STAINED_GLASS'");
+      cage_material = Material.PURPLE_STAINED_GLASS;
+    } else {
+      cage_material = parsedMaterial;
+    }
+
     cage_radius = plugin.getConfig().getInt("cage-building.cage-radius");
     cage_height = plugin.getConfig().getInt("cage-building.cage-height");
   }

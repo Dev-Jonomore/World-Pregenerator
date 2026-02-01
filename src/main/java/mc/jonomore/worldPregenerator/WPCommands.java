@@ -95,6 +95,7 @@ public class WPCommands {
       );
       return Command.SINGLE_SUCCESS;
     }
+    reset_timer.cancel();
 
     wp.stop();
 
@@ -107,49 +108,52 @@ public class WPCommands {
               "<yellow>[WARNING] Failed to extract worlds from world directory."
           )
       );
-      return Command.SINGLE_SUCCESS;
-    }
-
-    if (worlds.length == 0) {
-      ctx.getSource().getSender().sendMessage("No worlds to delete!");
-      wp.task.reset();
-      return Command.SINGLE_SUCCESS;
-    }
-
-    ctx.getSource().getSender().sendMessage("Deleting " + worlds.length + " worlds...");
-    Bukkit.getScheduler().runTaskAsynchronously(wp, () -> {
-      for (File world_folder : worlds) {
-        try {
-          util.deleteDirectory(world_folder);
-        } catch (IOException e) {
-          ctx.getSource().getSender().sendMessage(
-              MiniMessage.miniMessage().deserialize(
-                  "<red>[ERROR] Failed to delete world folder. " + e.getMessage()
-              )
-          );
+    } else if (worlds.length > 0) {
+      ctx.getSource().getSender().sendMessage("Deleting " + worlds.length + " exported worlds...");
+      Bukkit.getScheduler().runTaskAsynchronously(wp, () -> {
+        for (File world_folder : worlds) {
+          try {
+            util.deleteDirectory(world_folder);
+          } catch (IOException e) {
+            Bukkit.getScheduler().runTask(wp, () ->
+                ctx.getSource().getSender().sendMessage(
+                    MiniMessage.miniMessage().deserialize(
+                        "<red>[ERROR] Failed to delete world folder. " + e.getMessage()
+                    )
+                )
+            );
+          }
         }
-      }
 
-      Bukkit.getScheduler().runTask(wp, () -> {
-        File[] remaining_worlds = world_dir.listFiles();
-        if (remaining_worlds != null && remaining_worlds.length != 0) {
-          ctx.getSource().getSender().sendMessage(
-              MiniMessage.miniMessage().deserialize(
-                  "<yellow>[WARNING] there are still <dark_red>" +
-                      remaining_worlds.length + "</dark_red> worlds in your world directory."
-              )
-          );
-        } else {
-          ctx.getSource().getSender().sendMessage(
-              MiniMessage.miniMessage().deserialize(
-                  "<green>All worlds successfully deleted!"
-              )
-          );
-        }
+        Bukkit.getScheduler().runTask(wp, () -> {
+          File[] remaining_worlds = world_dir.listFiles();
+          if (remaining_worlds != null && remaining_worlds.length != 0) {
+            ctx.getSource().getSender().sendMessage(
+                MiniMessage.miniMessage().deserialize(
+                    "<yellow>[WARNING] there are still <dark_red>" +
+                        remaining_worlds.length + "</dark_red> worlds in your world directory."
+                )
+            );
+          } else {
+            ctx.getSource().getSender().sendMessage(
+                MiniMessage.miniMessage().deserialize(
+                    "<green>All exported worlds successfully deleted!"
+                )
+            );
+          }
+        });
       });
-    });
+    } else {
+      ctx.getSource().getSender().sendMessage("No exported worlds to delete!");
+    }
 
-    wp.task.reset();
+    // Reset the generation task, which also deletes any partially generated world
+    if (wp.task != null) {
+      wp.task.reset();
+      wp.task = null;
+      ctx.getSource().getSender().sendMessage("Generation task has been reset.");
+    }
+
     return Command.SINGLE_SUCCESS;
   }
 }

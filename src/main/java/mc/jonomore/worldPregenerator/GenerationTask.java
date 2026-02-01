@@ -72,7 +72,6 @@ public class GenerationTask {
     if (currentWorldName != null) {
       chunky.cancelTask(currentWorldName);
       logger.info("Cancelled Chunky task for: " + currentWorldName);
-      currentWorldName = null;
     }
 
     logger.info("World generation stopped at index " + currentIndex);
@@ -80,6 +79,17 @@ public class GenerationTask {
 
   public void reset() {
     stop();
+
+    // If a world was in the middle of processing, delete it.
+    if (currentWorldName != null) {
+      World worldToDelete = Bukkit.getWorld(currentWorldName);
+      if (worldToDelete != null) {
+        logger.info("Resetting: Deleting partially generated world " + currentWorldName);
+        unloadAndDeleteWorld(worldToDelete);
+      }
+      currentWorldName = null;
+    }
+
     currentIndex = 0;
     logger.info("Generation progress reset");
   }
@@ -146,27 +156,22 @@ public class GenerationTask {
   private void generateChunks(World world, Runnable onComplete) {
     int radius = config.getRadius();
 
-    if (chunky.version() == 0) {
-      logger.info("Starting chunk generation (radius: " + radius + ")");
-      chunky.startTask(
-          world.getName(),
-          "square",
-          world.getSpawnLocation().getX(),
-          world.getSpawnLocation().getZ(),
-          radius,
-          radius,
-          "concentric");
+    logger.info("Starting chunk generation (radius: " + radius + ")");
+    chunky.startTask(
+        world.getName(),
+        "square",
+        world.getSpawnLocation().getX(),
+        world.getSpawnLocation().getZ(),
+        radius,
+        radius,
+        "concentric");
 
-      chunky.onGenerationComplete(event -> {
-        if (event.world().equals(world.getName())) {
-          logger.info("Chunk generation completed for " + event.world());
-          Bukkit.getScheduler().runTask(plugin, onComplete);
-        }
-      });
-    } else {
-      logger.warning("Chunky API version mismatch. Expected 0, got " + chunky.version());
-      onComplete.run();
-    }
+    chunky.onGenerationComplete(event -> {
+      if (event.world().equals(world.getName())) {
+        logger.info("Chunk generation completed for " + event.world());
+        Bukkit.getScheduler().runTask(plugin, onComplete);
+      }
+    });
   }
 
   private void checkSpawn(World world) {
@@ -208,7 +213,7 @@ public class GenerationTask {
     });
   }
 
-  private void unloadAndDeleteWorld(World world) {
+  public void unloadAndDeleteWorld(World world) {
     String worldName = world.getName();
     File worldFolder = world.getWorldFolder();
 
