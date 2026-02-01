@@ -18,22 +18,26 @@ public final class WorldPregenerator extends JavaPlugin {
   public void start() {
     if (running) {
       getLogger().warning("Generation already running!");
+      return;
     }
-    else {
+
+    if (task == null) {
+      getLogger().info("No task found, creating a new one.");
       List<Long> seeds = readSeeds();
-      if (!seeds.isEmpty()) {
-        ChunkyAPI chunky = getServer().getServicesManager().load(ChunkyAPI.class);
-        if (chunky != null) {
-          running = true;
-          task = new GenerationTask(this, seeds, chunky);
-          task.start();
-        } else {
-          getLogger().severe("Chunky API not found! Make sure Chunky plugin is installed.");
-        }
-      } else {
+      if (seeds.isEmpty()) {
         getLogger().warning("No seeds found in file!");
+        return;
       }
+      ChunkyAPI chunky = getServer().getServicesManager().load(ChunkyAPI.class);
+      if (chunky == null) {
+        getLogger().severe("Chunky API not found! Make sure Chunky plugin is installed.");
+        return;
+      }
+      task = new GenerationTask(this, seeds, chunky);
     }
+
+    running = true;
+    task.start();
   }
 
   public void stop() {
@@ -43,7 +47,6 @@ public final class WorldPregenerator extends JavaPlugin {
       running = false;
       if (task != null) {
         task.stop();
-        task = null;
       }
     }
   }
@@ -80,7 +83,6 @@ public final class WorldPregenerator extends JavaPlugin {
     if (running && task != null) {
       getLogger().info("Stopping generation due to plugin disable...");
       task.stop();
-      task = null;
       running = false;
     }
   }
