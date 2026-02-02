@@ -4,9 +4,10 @@ import io.papermc.paper.plugin.lifecycle.event.types.LifecycleEvents;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.popcraft.chunky.api.ChunkyAPI;
 
-import java.io.File;
-import java.io.FileNotFoundException;
-import java.util.ArrayList;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.util.Collections;
 import java.util.List;
 
 public final class WorldPregenerator extends JavaPlugin {
@@ -52,17 +53,14 @@ public final class WorldPregenerator extends JavaPlugin {
   }
 
   private List<Long> readSeeds() {
-    List<Long> seeds = new ArrayList<>();
     try {
-      java.util.Scanner scanner = new java.util.Scanner(new File(config.getSeedsFile()));
-      while (scanner.hasNextLong()) {
-        seeds.add(scanner.nextLong());
-      }
-    } catch (FileNotFoundException e) {
-      getLogger().severe("Seeds file not found: " + e.getMessage());
+      return Files.lines(Paths.get(config.getSeedsFile()))
+          .map(Long::parseLong)
+          .toList();
+    } catch (IOException e) {
+      getLogger().severe("Error reading seeds: " + e.getMessage());
+      return Collections.emptyList();
     }
-    getLogger().info("Loaded " + seeds.size() + " seeds from file");
-    return seeds;
   }
 
   @Override
