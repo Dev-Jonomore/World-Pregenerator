@@ -100,25 +100,26 @@ public class WPCommands {
     wp.stop();
 
     File world_dir = new File(wp.config.getExportPath());
-    File[] worlds = world_dir.listFiles();
 
-    if (worlds == null) {
+    File[] exported_worlds = world_dir.listFiles();
+
+    if (exported_worlds == null) {
       ctx.getSource().getSender().sendMessage(
           MiniMessage.miniMessage().deserialize(
-              "<yellow>[WARNING] Failed to extract worlds from world directory."
+              "<yellow>[WARNING] Failed to extract exported_worlds from world directory."
           )
       );
-    } else if (worlds.length > 0) {
-      ctx.getSource().getSender().sendMessage("Deleting " + worlds.length + " exported worlds...");
+    } else if (exported_worlds.length > 0) {
+      ctx.getSource().getSender().sendMessage("Deleting " + exported_worlds.length + " exported worlds...");
       Bukkit.getScheduler().runTaskAsynchronously(wp, () -> {
-        for (File world_folder : worlds) {
+        for (File world_folder : exported_worlds) {
           try {
             util.deleteDirectory(world_folder);
           } catch (IOException e) {
             Bukkit.getScheduler().runTask(wp, () ->
                 ctx.getSource().getSender().sendMessage(
                     MiniMessage.miniMessage().deserialize(
-                        "<red>[ERROR] Failed to delete world folder. " + e.getMessage()
+                        "<red>[ERROR] Failed to delete world file. " + e.getMessage()
                     )
                 )
             );
