@@ -3,7 +3,7 @@ package mc.jonomore.worldPregenerator;
 import java.io.File;
 import java.io.IOException;
 
-public class util {
+public class Util {
   static void deleteDirectory(File directory) throws IOException {
     if (directory.exists()) {
       File[] files = directory.listFiles();

@@ -1,0 +1,41 @@
+# Build outputs
+build/
+.gradle/
+*.jar
+*.class
+
+# IDE files
+.idea/
+.vscode/
+*.iml
+*.ipr
+*.iws
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+logs/
+*.log
+
+# Minecraft server files (if running test server)
+cache/
+libraries/
+versions/
+server.jar
+eula.txt
+world/
+world_nether/
+world_the_end/
+
+# Temporary files
+*.tmp
+*.temp
+
+# Don't ignore project config and source
+!src/
+!*.gradle
+!*.yml
+!*.java
+!*.md

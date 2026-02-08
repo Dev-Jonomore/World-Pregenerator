@@ -126,8 +126,8 @@ public class SlimeGenerationTask extends BukkitRunnable {
                 "square",
                 Objects.requireNonNull(tempWorld.getSpawnLocation()).getX(),
                 tempWorld.getSpawnLocation().getZ(),
-                config.getRadius(),
-                config.getRadius(),
+                config.getGenerationRadius(),
+                config.getGenerationRadius(),
                 "concentric");
 
         chunky.onGenerationComplete(event -> {
@@ -207,7 +207,7 @@ public class SlimeGenerationTask extends BukkitRunnable {
                 // Delete world folder asynchronously to avoid blocking the main thread
                 Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
                     try {
-                        util.deleteDirectory(worldFolder);
+                        Util.deleteDirectory(worldFolder);
                         logger.info("Temporary world folder deleted: " + worldName);
                     } catch (IOException e) {
                         logger.log(Level.SEVERE, "Failed to delete temporary world folder: " + worldName, e);

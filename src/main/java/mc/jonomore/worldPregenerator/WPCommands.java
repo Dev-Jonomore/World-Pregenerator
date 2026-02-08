@@ -114,7 +114,7 @@ public class WPCommands {
       Bukkit.getScheduler().runTaskAsynchronously(wp, () -> {
         for (File world_folder : exported_worlds) {
           try {
-            util.deleteDirectory(world_folder);
+            Util.deleteDirectory(world_folder);
           } catch (IOException e) {
             Bukkit.getScheduler().runTask(wp, () ->
                 ctx.getSource().getSender().sendMessage(

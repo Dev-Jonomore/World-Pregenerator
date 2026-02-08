@@ -195,7 +195,7 @@ public class GenerationTask {
    * @param onComplete Callback to run when generation completes
    */
   private void generateChunks(World world, Runnable onComplete) {
-    int radius = config.getRadius();
+    int radius = config.getGenerationRadius();
 
     logger.info("Starting chunk generation (radius: " + radius + ")");
     chunky.startTask(
@@ -295,7 +295,7 @@ public class GenerationTask {
 
     Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
       try {
-        util.deleteDirectory(worldFolder);
+        Util.deleteDirectory(worldFolder);
         logger.info("World folder deleted: " + worldName);
       } catch (IOException e) {
         logger.log(java.util.logging.Level.SEVERE, "Failed to delete world folder", e);
