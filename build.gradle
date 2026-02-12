@@ -25,8 +25,8 @@ repositories {
 dependencies {
     compileOnly "io.papermc.paper:paper-api:1.21.11-R0.1-SNAPSHOT"
     compileOnly "org.popcraft:chunky-common:1.3.38"
-    compileOnly "com.infernalsuite.asp:api:4.1.0-SNAPSHOT"
-    implementation "com.infernalsuite.asp:file-loader:4.1.0-SNAPSHOT"
+    compileOnly "com.infernalsuite.asp:api:4.2.0-SNAPSHOT"
+    implementation "com.infernalsuite.asp:file-loader:4.2.0-SNAPSHOT"
 }
 
 tasks {
