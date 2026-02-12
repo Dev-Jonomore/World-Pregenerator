@@ -2,6 +2,10 @@
 
 Paper/Bukkit plugin that batch-generates Minecraft worlds from seed lists, converts them to SlimeWorld format, and exports them with safe spawn points and protective cages.
 
+### Current Issues:
+
+@./ISSUES.md
+
 ## General Instructions
 - Follow existing code patterns when modifying or extending functionality
 - Always handle async operations with proper callbacks to avoid state machine deadlocks
@@ -112,6 +116,10 @@ build/libs/worldPregenerator-1.0-SNAPSHOT.jar
 - Initialize nullable fields explicitly: `= null`
 - Use bit-packing for coordinate storage when memory-efficient data structures needed
 
+### Further Reading:
+
+@./CONVENTIONS.md
+
 ## Critical Patterns
 
 ### Coordinate Packing
@@ -181,11 +189,19 @@ chunky.onGenerationComplete(event -> { ... });
 chunky.cancelTask(worldName);
 ```
 
+### Further reading:
+
+@./CHUNKY_REF.md
+
 **AdvancedSlimePaper API** (world conversion):
 ```java
 SlimeLoader loader = new FileLoader(exportDir);
 SlimeWorld slime = slimeAPI.readVanillaWorld(worldDir, worldName, loader);
 ```
+
+### Further reading:
+
+@./ASP_REF.md
 
 **Paper Lifecycle Events** (modern command registration):
 ```java

@@ -15,13 +15,8 @@ This file documents known bugs, technical debt, planned features, and areas for 
 ## Known Issues (Fix These)
 
 ### P0: No Progress Persistence
-**Status**: Open  
+**Status**: Closed ✅
 **Impact**: Server crash or restart loses all generation progress
-
-**Current Behavior**:
-- `currentIndex` resets to 0 on plugin reload
-- Partial worlds remain in export directory
-- Must manually restart from beginning
 
 **Required Changes**:
 1. Create `GenerationState` class with save/load methods
@@ -36,21 +31,8 @@ This file documents known bugs, technical debt, planned features, and areas for 
 ---
 
 ### P0: Resource Cleanup Race Condition
-**Status**: Open  
+**Status**: Closed ✅
 **Impact**: Failed deletions leave corrupt state, no retry mechanism
-
-**Current Behavior**:
-```java
-// Deletes async, no verification
-Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
-    try {
-        Util.deleteDirectory(worldFolder);
-    } catch (IOException e) {
-        logger.log(Level.SEVERE, "Failed to delete", e);
-        // No retry, no callback, just logs error
-    }
-});
-```
 
 **Required Changes**:
 1. Add callback parameter to `unloadAndDeleteWorld()`
@@ -60,21 +42,13 @@ Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
 
 **Files to Modify**:
 - `GenerationTask.java` - add deletion callback
-- `Util.java` - add retry wrapper for `deleteDirectory()`
+- `FileUtils.java` (previously `Util.java`) - add retry wrapper for `deleteDirectory()`
 
 ---
 
 ### P1: No Error Recovery Strategy
-**Status**: Open  
+**Status**: Closed ✅
 **Impact**: Fatal errors cause endless retry loops, wasting resources
-
-**Current Behavior**:
-```java
-} catch (Exception e) {
-    logger.log(Level.SEVERE, "Error", e);
-    moveOn(); // Always continues regardless of error type
-}
-```
 
 **Required Changes**:
 1. Categorize exceptions:
@@ -91,7 +65,7 @@ Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
 ---
 
 ### P1: No Generation Progress Feedback
-**Status**: Open  
+**Status**: Closed ✅
 **Impact**: Users can't check progress without reading logs
 
 **Required Changes**:
@@ -110,14 +84,8 @@ Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
 ---
 
 ### P2: Config Validation Missing
-**Status**: Open  
+**Status**: Closed ✅
 **Impact**: Invalid config values cause runtime errors
-
-**Current Behavior**:
-```java
-cage_radius = plugin.getConfig().getInt("cage-building.cage-radius");
-// No validation - could be negative or huge
-```
 
 **Required Changes**:
 Add validation in `ConfigManager.loadConfig()`:
@@ -144,58 +112,21 @@ if (cage_radius < 0 || cage_radius > 100) {
 
 ---
 
-### P2: BFS Spawn Search Can Be Slow
-**Status**: Open  
-**Impact**: Ocean spawns search entire 100-block radius unnecessarily
-
-**Optimization Ideas**:
-1. Add max iterations limit (not just radius)
-2. Spiral search instead of BFS (finds closer solutions first)
-3. Add timeout for spawn search (configurable)
-4. Cache ground level results during vertical scan
-
-**Files to Modify**:
-- `SpawnAdjuster.java` - implement spiral search pattern
-
----
-
 ### P3: Hardcoded Values
-**Status**: Open  
+**Status**: Closed ✅
 **Impact**: Minor - reduces flexibility
 
 **Items to Move to Config**:
-- Reset confirmation timeout (currently 30 seconds hardcoded)
 - Delay between world processing (currently 40 ticks)
-- Location centering offset (currently 0.5)
 
 **Files to Modify**:
 - `config.yml` - add new fields
 - `ConfigManager.java` - add getters
-- `WPCommands.java` - use config value
 - `GenerationTask.java` - use config value
 
 ---
 
 ## Planned Features (Add These)
-
-### P1: Pause/Resume Commands
-**Justification**: Users need control without losing progress
-
-**Implementation**:
-```
-/wp pause  - Finish current world then pause (sets interrupted=true after completion)
-/wp resume - Continue from last position (calls task.start())
-```
-
-State transitions:
-- RUNNING → PAUSED (finish current world first)
-- PAUSED → RUNNING (resume immediately)
-
-**Files to Modify**:
-- `WPCommands.java` - add pause/resume commands
-- `GenerationTask.java` - add pause() method (softer than stop())
-
----
 
 ### P2: Dry Run Mode
 **Justification**: Test configuration without generating worlds
@@ -233,27 +164,6 @@ batch-settings:
 - `config.yml` - add batch settings
 - `ConfigManager.java` - add batch config getters
 - `GenerationTask.java` - implement batch logic
-
----
-
-### P3: Seed Filtering
-**Justification**: Skip undesirable spawn locations automatically
-
-**Config Addition**:
-```yaml
-seed-filtering:
-  enabled: true
-  skip-ocean-spawns: true
-  skip-void-spawns: true
-  required-biomes: [PLAINS, FOREST, DESERT]  # empty = any
-```
-
-**Implementation**: After spawn adjustment, check biome and skip if filtered
-
-**Files to Modify**:
-- `config.yml` - add filtering settings
-- `ConfigManager.java` - add filter config
-- `GenerationTask.java` - add filtering logic after spawn check
 
 ---
 
@@ -317,6 +227,7 @@ Post-Release Testing:
 ## Refactoring Tasks
 
 ### Extract State Management Class
+**Status**: Closed ✅
 **Justification**: State handling is scattered, makes persistence difficult
 
 **Create**: `GenerationState.java`
@@ -341,6 +252,7 @@ public class GenerationState {
 ---
 
 ### Replace Callback Hell with CompletableFuture
+**Status**: Open
 **Justification**: Current nested callbacks are hard to read and maintain
 
 **Current**:
@@ -374,6 +286,7 @@ CompletableFuture.supplyAsync(() -> createWorld(seed))
 ---
 
 ### Centralize Magic Numbers
+**Status**: Closed ✅
 **Justification**: Hardcoded values scattered throughout code
 
 **Create**: Constants class or move to config
@@ -392,6 +305,7 @@ public class GenerationConstants {
 ## Documentation Needed
 
 ### README.md
+**Status**: Closed ✅
 **Required Sections**:
 - Installation (where to get dependencies)
 - Quick start (basic setup in 5 steps)
@@ -461,27 +375,37 @@ if (usage > 0.85) {
 
 ---
 
-## Current Sprint (Do Next)
+## Next Sprint (Do Next)
 
-1. **Add progress persistence** (P0) - prevents data loss on crash
-2. **Add status command** (P1) - basic usability requirement  
-3. **Add config validation** (P2) - prevents runtime errors
-4. **Write README.md** - documentation gap
+**Goal**: Improve code readability, maintainability, and add core features.
 
 **Estimated Time**: 8-12 hours
 
-**Success Criteria**:
-- Server restart resumes generation automatically
-- `/wp status` shows accurate progress
-- Invalid config values are caught on load with helpful messages
-- New users can set up plugin from README alone
+**Tasks**:
+
+1.  **Replace Callback Hell with CompletableFuture (P2 Refactoring)**:
+    *   **Justification**: Current nested callbacks are hard to read and maintain. CompletableFuture will improve code clarity, error handling, and make it easier to add new steps to the generation pipeline.
+    *   **Files to Modify**: `GenerationTask.java`
+    *   **Success Criteria**: `GenerationTask.java` uses `CompletableFuture` for its async operations, eliminating deeply nested callbacks.
+
+2.  **Dry Run Mode (P2 Planned Feature)**:
+    *   **Justification**: Allows users to validate configuration and dependencies without initiating a full world generation, saving time and resources.
+    *   **Implementation**: Add `/wp dryrun` command to `WPCommands.java`. Create a new `ConfigValidator.java` to centralize validation logic.
+    *   **Files to Modify**: `WPCommands.java`, New file: `ConfigValidator.java`
+    *   **Success Criteria**: `/wp dryrun` command exists and performs all specified checks, providing clear feedback to the user.
+
+3.  **Batch Configuration (P2 Planned Feature)**:
+    *   **Justification**: Reduces server load during generation and allows for scheduled or more controlled world generation.
+    *   **Implementation**: Add `batch-settings` to `config.yml`, `ConfigManager.java` for getters, and implement batch logic in `GenerationTask.java`.
+    *   **Files to Modify**: `config.yml`, `ConfigManager.java`, `GenerationTask.java`
+    *   **Success Criteria**: Plugin can generate worlds in batches with configurable pauses and auto-resume capabilities.
 
 ---
 
 ## Code Organization Tasks
 
 ### P3: Reorganize Utility Code
-**Status**: Open  
+**Status**: Closed ✅
 **Justification**: `Util.java` only has one method (`deleteDirectory`), unclear if it should exist as separate class
 
 **Current State**:

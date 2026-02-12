@@ -6,6 +6,10 @@ import org.bukkit.Tag;
 import org.bukkit.World;
 import org.bukkit.block.Block;
 
+import static mc.jonomore.worldPregenerator.CoordinateUtils.pack;
+import static mc.jonomore.worldPregenerator.CoordinateUtils.unpackX;
+import static mc.jonomore.worldPregenerator.CoordinateUtils.unpackZ;
+
 /**
  * Uses BFS to find a safe spawn location in a Minecraft world.
  * Searches the x-z plane and scans vertically to find valid ground.
@@ -158,13 +162,15 @@ public class SpawnAdjuster {
 
     Material startMat = world.getBlockAt(x, hintY, z).getType();
 
+    double offset = GenerationConstants.LOCATION_CENTER_OFFSET;
+
     // If in air or leaves, scan DOWN to find ground
     if (startMat.isAir() || Tag.LEAVES.isTagged(startMat)) {
       for (int y = hintY; y > minY; y--) {
         Material mat = world.getBlockAt(x, y, z).getType();
 
         if (!mat.isAir() && !Tag.LEAVES.isTagged(mat)) {
-          return new Location(world, x + 0.5, y + 1, z + 0.5);
+          return new Location(world, x + offset, y + 1, z + offset);
         }
       }
     }
@@ -176,24 +182,11 @@ public class SpawnAdjuster {
 
         if (!currentMat.isAir() && !Tag.LEAVES.isTagged(currentMat)
             && (aboveMat.isAir() || Tag.LEAVES.isTagged(aboveMat))) {
-          return new Location(world, x + 0.5, y + 1, z + 0.5);
+          return new Location(world, x + offset, y + 1, z + offset);
         }
       }
     }
 
     return null;
   }
-
-  static long pack(int x, int z) {
-    return (((long) x) << 32) | (z & 0xffffffffL);
-  }
-
-  static int unpackX(long packed) {
-    return (int) (packed >> 32);
-  }
-
-  static int unpackZ(long packed) {
-    return (int) packed;
-  }
-
 }

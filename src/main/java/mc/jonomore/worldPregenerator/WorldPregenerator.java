@@ -1,20 +1,25 @@
 package mc.jonomore.worldPregenerator;
 
 import io.papermc.paper.plugin.lifecycle.event.types.LifecycleEvents;
+import org.bukkit.Bukkit;
+import org.bukkit.World;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.popcraft.chunky.api.ChunkyAPI;
 
+import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.Collections;
 import java.util.List;
+import java.util.logging.Level;
 
 public final class WorldPregenerator extends JavaPlugin {
 
   ConfigManager config;
   boolean running = false;
   GenerationTask task = null;
+  GenerationState state = null;
 
   public void start() {
     if (running) {
@@ -34,7 +39,12 @@ public final class WorldPregenerator extends JavaPlugin {
         getLogger().severe("Chunky API not found! Make sure Chunky plugin is installed.");
         return;
       }
-      task = new GenerationTask(this, seeds, chunky);
+      
+      if (state == null) {
+          state = new GenerationState();
+      }
+      
+      task = new GenerationTask(this, seeds, chunky, state);
     }
 
     running = true;
@@ -52,12 +62,30 @@ public final class WorldPregenerator extends JavaPlugin {
     }
   }
 
+  public void reset() {
+      if (task != null) {
+          task.reset();
+          task = null;
+          state = null;
+          running = false;
+          
+          File stateFile = new File(getDataFolder(), GenerationConstants.STATE_FILE_NAME);
+          if (stateFile.exists()) {
+              stateFile.delete();
+          }
+      } else {
+          getLogger().warning("No task to reset!");
+      }
+  }
+
   private List<Long> readSeeds() {
     try {
       return Files.lines(Paths.get(config.getSeedsFile()))
+          .map(String::trim)
+          .filter(line -> !line.isEmpty())
           .map(Long::parseLong)
           .toList();
-    } catch (IOException e) {
+    } catch (IOException | NumberFormatException e) {
       getLogger().severe("Error reading seeds: " + e.getMessage());
       return Collections.emptyList();
     }
@@ -66,6 +94,9 @@ public final class WorldPregenerator extends JavaPlugin {
   @Override
   public void onEnable() {
     config = new ConfigManager(this);
+    
+    loadState();
+    
     this.getLifecycleManager().registerEventHandler(
         LifecycleEvents.COMMANDS,
         commands -> commands.registrar().register(
@@ -73,6 +104,34 @@ public final class WorldPregenerator extends JavaPlugin {
             List.of("wp", "worldpregen")
         )
     );
+
+    if (state != null && state.getCurrentIndex() > 0 && !"COMPLETED".equals(state.getCurrentStep())) {
+        getLogger().info("Found previous generation state. You can resume with /wp start");
+        
+        // Cleanup partial world if it exists
+        if (state.getCurrentWorldName() != null) {
+            String worldName = state.getCurrentWorldName();
+            File worldFolder = new File(getServer().getWorldContainer(), worldName);
+            if (worldFolder.exists()) {
+                getLogger().info("Cleaning up partial world from previous run: " + worldName);
+                Bukkit.getScheduler().runTaskLater(this, () -> {
+                    World world = Bukkit.getWorld(worldName);
+                    if (world != null) {
+                        Bukkit.unloadWorld(world, false);
+                    }
+                    Bukkit.getScheduler().runTaskAsynchronously(this, () -> {
+                        try {
+                            FileUtils.deleteDirectory(worldFolder);
+                            getLogger().info("Successfully cleaned up " + worldName);
+                        } catch (IOException e) {
+                            getLogger().log(Level.SEVERE, "Failed to cleanup partial world " + worldName, e);
+                        }
+                    });
+                }, 20L); // Wait a bit for server to fully start
+            }
+        }
+    }
+
     getLogger().info("WorldPregenerator enabled!");
   }
 
@@ -83,5 +142,17 @@ public final class WorldPregenerator extends JavaPlugin {
       task.stop();
       running = false;
     }
+  }
+  
+  private void loadState() {
+      File stateFile = new File(getDataFolder(), GenerationConstants.STATE_FILE_NAME);
+      if (stateFile.exists()) {
+          try {
+              state = GenerationState.load(stateFile);
+              getLogger().info("Loaded generation state from " + GenerationConstants.STATE_FILE_NAME);
+          } catch (IOException e) {
+              getLogger().log(Level.SEVERE, "Failed to load generation state", e);
+          }
+      }
   }
 }
