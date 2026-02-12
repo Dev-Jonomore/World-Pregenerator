@@ -4,3 +4,4 @@ main: mc.jonomore.worldPregenerator.WorldPregenerator
 api-version: '1.21'
 depend:
   - Chunky
+  - AdvancedSlimePurpur

@@ -34,7 +34,7 @@ public class CageBuilder {
 
     // Loop through the bounds efficiently
     for (int x = minX; x <= maxX; ++x) {
-      for (int y = floorY; y <= ceilingY; y += 2) {
+      for (int y = floorY; y <= ceilingY; y += GenerationConstants.CAGE_Y_SKIP) {
         boolean isFloorOrCeiling = y == floorY || y == ceilingY;
         for (int z = minZ; z <= maxZ; ++z) {
 

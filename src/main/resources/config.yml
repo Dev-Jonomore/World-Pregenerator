@@ -8,3 +8,4 @@ cage-building:
   cage-material: PURPLE_STAINED_GLASS
   cage-radius: 4
   cage-height: 3
+world-delay-ticks: 40

@@ -1,21 +1,22 @@
 package mc.jonomore.worldPregenerator;
 
 import org.bukkit.Material;
+import java.io.File;
 
-import java.util.Objects;
-
-public class ConfigManager {
+public class
+ConfigManager {
   private final WorldPregenerator plugin;
 
   // Cached config values
-  private int generation_radius;
+  private int generationRadius;
   private String exportPath;
   private String seedsFile;
   private int maxSearchRadius;
   private int maxVerticalScan;
-  private Material cage_material;
-  private int cage_radius;
-  private int cage_height;
+  private Material cageMaterial;
+  private int cageRadius;
+  private int cageHeight;
+  private long worldDelayTicks;
 
   public ConfigManager(WorldPregenerator plugin) {
     this.plugin = plugin;
@@ -25,27 +26,67 @@ public class ConfigManager {
 
   public void loadConfig() {
     plugin.reloadConfig();
-    generation_radius = plugin.getConfig().getInt("generation-radius");
-    exportPath = plugin.getConfig().getString("export-path");
-    seedsFile = plugin.getConfig().getString("seeds-file");
-    maxSearchRadius = plugin.getConfig().getInt("spawn-adjustment.maxSearchRadius");
-    maxVerticalScan = plugin.getConfig().getInt("spawn-adjustment.maxVerticalScan");
+    
+    generationRadius = plugin.getConfig().getInt("generation-radius", 1200);
+    if (generationRadius < 100 || generationRadius > 10000) {
+        plugin.getLogger().warning("generation-radius out of range [100,10000]: " + generationRadius + ". Defaulting to 1200.");
+        generationRadius = 1200;
+    }
+
+    exportPath = plugin.getConfig().getString("export-path", "exported_worlds");
+    File exportDir = new File(exportPath);
+    if (!exportDir.exists() && !exportDir.mkdirs()) {
+        plugin.getLogger().warning("export-path directory could not be created or found: " + exportPath);
+    }
+
+    seedsFile = plugin.getConfig().getString("seeds-file", "seeds.txt");
+    File sFile = new File(seedsFile);
+    if (!sFile.exists()) {
+        plugin.getLogger().warning("seeds-file does not exist: " + seedsFile);
+    }
+
+    maxSearchRadius = plugin.getConfig().getInt("spawn-adjustment.maxSearchRadius", 100);
+    if (maxSearchRadius < 10 || maxSearchRadius > 256) {
+        plugin.getLogger().warning("maxSearchRadius out of range [10,256]: " + maxSearchRadius + ". Defaulting to 100.");
+        maxSearchRadius = 100;
+    }
+
+    maxVerticalScan = plugin.getConfig().getInt("spawn-adjustment.maxVerticalScan", 128);
+    if (maxVerticalScan < 10 || maxVerticalScan > 256) {
+        plugin.getLogger().warning("maxVerticalScan out of range [10,256]: " + maxVerticalScan + ". Defaulting to 128.");
+        maxVerticalScan = 128;
+    }
 
     String cageMaterialName = plugin.getConfig().getString("cage-building.cage-material", "PURPLE_STAINED_GLASS");
     Material parsedMaterial = Material.getMaterial(cageMaterialName);
     if (parsedMaterial == null) {
       plugin.getLogger().warning("Invalid cage material: '" + cageMaterialName + "'. Defaulting to 'PURPLE_STAINED_GLASS'");
-      cage_material = Material.PURPLE_STAINED_GLASS;
+      cageMaterial = Material.PURPLE_STAINED_GLASS;
     } else {
-      cage_material = parsedMaterial;
+      cageMaterial = parsedMaterial;
     }
 
-    cage_radius = plugin.getConfig().getInt("cage-building.cage-radius");
-    cage_height = plugin.getConfig().getInt("cage-building.cage-height");
+    cageRadius = plugin.getConfig().getInt("cage-building.cage-radius", 4);
+    if (cageRadius < 2 || cageRadius > 10) {
+        plugin.getLogger().warning("cage-radius out of range [2,10]: " + cageRadius + ". Defaulting to 4.");
+        cageRadius = 4;
+    }
+
+    cageHeight = plugin.getConfig().getInt("cage-building.cage-height", 3);
+    if (cageHeight < 3 || cageHeight > 9 || cageHeight % 2 == 0) {
+        plugin.getLogger().warning("cage-height must be an odd number between 3-9: " + cageHeight + ". Defaulting to 3.");
+        cageHeight = 3;
+    }
+    
+    worldDelayTicks = plugin.getConfig().getLong("world-delay-ticks", 40L);
+    if (worldDelayTicks < 0) {
+        plugin.getLogger().warning("world-delay-ticks cannot be negative: " + worldDelayTicks + ". Defaulting to 40.");
+        worldDelayTicks = 40L;
+    }
   }
 
-  public int getRadius() {
-    return generation_radius;
+  public int getGenerationRadius() {
+    return generationRadius;
   }
 
   public String getExportPath() {
@@ -60,23 +101,26 @@ public class ConfigManager {
 
   public int getMaxVerticalScan() { return maxVerticalScan; }
 
-  public Material getCageMaterial() { return cage_material; }
+  public Material getCageMaterial() { return cageMaterial; }
 
-  public int getCageRadius() { return cage_radius; }
+  public int getCageRadius() { return cageRadius; }
 
-  public int getCageHeight() { return cage_height; }
+  public int getCageHeight() { return cageHeight; }
+
+  public long getWorldDelayTicks() { return worldDelayTicks; }
 
   @Override
   public String toString() {
-    return "generation-radius: " + generation_radius + "\n" +
+    return "generation-radius: " + generationRadius + "\n" +
         "export-path: " + exportPath + "\n" +
         "seeds-file: " + seedsFile + "\n" +
         "spawn-adjustment:\n" +
         "  maxSearchRadius: " + maxSearchRadius + "\n" +
         "  maxVerticalScan: " + maxVerticalScan + "\n" +
         "cage-building:\n" +
-        "  cage-material: " + cage_material + "\n" +
-        "  cage-radius: " + cage_radius + "\n" +
-        "  cage-height: " + cage_height;
+        "  cage-material: " + cageMaterial + "\n" +
+        "  cage-radius: " + cageRadius + "\n" +
+        "  cage-height: " + cageHeight + "\n" +
+        "world-delay-ticks: " + worldDelayTicks;
   }
 }
