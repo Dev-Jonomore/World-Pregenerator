@@ -2,6 +2,9 @@ package mc.jonomore.worldPregenerator;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import com.google.gson.JsonDeserializer;
+import com.google.gson.JsonPrimitive;
+import com.google.gson.JsonSerializer;
 
 import java.io.*;
 import java.util.ArrayList;
@@ -18,7 +21,11 @@ public class GenerationState {
     private String currentWorldName = null;
     private File currentWorldFolder = null;
 
-    private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
+    private static final Gson GSON = new GsonBuilder()
+            .registerTypeAdapter(File.class, (JsonSerializer<File>) (src, typeOfSrc, context) -> new JsonPrimitive(src.getPath()))
+            .registerTypeAdapter(File.class, (JsonDeserializer<File>) (json, typeOfT, context) -> new File(json.getAsString()))
+            .setPrettyPrinting()
+            .create();
 
     public GenerationState() {}
 
