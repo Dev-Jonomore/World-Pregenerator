@@ -129,6 +129,7 @@ if (cage_radius < 0 || cage_radius > 100) {
 ## Planned Features (Add These)
 
 ### P2: Dry Run Mode
+**Status**: Closed ✅
 **Justification**: Test configuration without generating worlds
 
 **Implementation**:
@@ -150,6 +151,7 @@ Checks:
 ---
 
 ### P2: Batch Configuration
+**Status**: Closed ✅
 **Justification**: Reduce server load, allow scheduled generation
 
 **Config Addition**:
@@ -252,7 +254,7 @@ public class GenerationState {
 ---
 
 ### Replace Callback Hell with CompletableFuture
-**Status**: Open
+**Status**: Closed ✅
 **Justification**: Current nested callbacks are hard to read and maintain
 
 **Current**:

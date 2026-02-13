@@ -16,6 +16,7 @@ public class GenerationState {
     private List<Long> failedSeeds = new ArrayList<>();
     private String currentStep = "IDLE";
     private String currentWorldName = null;
+    private File currentWorldFolder = null;
 
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
 
@@ -57,6 +58,9 @@ public class GenerationState {
 
     public String getCurrentWorldName() { return currentWorldName; }
     public void setCurrentWorldName(String currentWorldName) { this.currentWorldName = currentWorldName; }
+
+    public File getCurrentWorldFolder() { return currentWorldFolder; }
+    public void setCurrentWorldFolder(File currentWorldFolder) { this.currentWorldFolder = currentWorldFolder; }
 
     public double getProgress() {
         if (totalSeeds == 0) return 0;

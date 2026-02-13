@@ -26,6 +26,15 @@ public class WPCommands {
               return Command.SINGLE_SUCCESS;
             })
         )
+        .then(Commands.literal("dryrun")
+            .executes(ctx -> {
+                ConfigValidator validator = new ConfigValidator(wp);
+                for (String result : validator.validate()) {
+                    ctx.getSource().getSender().sendMessage(MiniMessage.miniMessage().deserialize(result));
+                }
+                return Command.SINGLE_SUCCESS;
+            })
+        )
         .then(Commands.literal("stop")
             .executes(ctx -> {
               wp.stop();

@@ -18,6 +18,7 @@ import org.popcraft.chunky.api.ChunkyAPI;
 import java.io.File;
 import java.io.IOException;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 import java.util.logging.Level;
 
 public class GenerationTask {
@@ -34,8 +35,10 @@ public class GenerationTask {
   private final File stateFile;
 
   private int retryCount = 0;
+  private int worldsInCurrentBatch = 0;
   private boolean interrupted = false;
   private BukkitTask scheduledTask = null;
+  private CompletableFuture<World> chunkyFuture = null;
 
   /**
    * Constructor for GenerationTask
@@ -67,6 +70,23 @@ public class GenerationTask {
     );
 
     this.state.setTotalSeeds(seeds.size());
+
+    // Register Chunky listener once
+    this.chunky.onGenerationComplete(event -> {
+        if (chunkyFuture != null && state.getCurrentWorldName() != null && event.world().equals(state.getCurrentWorldName())) {
+            logger.info("Chunk generation completed for " + event.world());
+            CompletableFuture<World> future = chunkyFuture;
+            chunkyFuture = null;
+            Bukkit.getScheduler().runTask(plugin, () -> {
+                World world = Bukkit.getWorld(event.world());
+                if (world != null) {
+                    future.complete(world);
+                } else {
+                    future.completeExceptionally(new RuntimeException("World " + event.world() + " not found after generation"));
+                }
+            });
+        }
+    });
   }
 
   /**
@@ -107,6 +127,10 @@ public class GenerationTask {
     if (state.getCurrentWorldName() != null) {
       chunky.cancelTask(state.getCurrentWorldName());
       logger.info("Cancelled Chunky task for: " + state.getCurrentWorldName());
+      if (chunkyFuture != null) {
+          chunkyFuture.completeExceptionally(new RuntimeException("Generation stopped by user"));
+          chunkyFuture = null;
+      }
     }
 
     state.setCurrentStep("STOPPED");
@@ -122,16 +146,22 @@ public class GenerationTask {
 
     // If a world was in the middle of processing, delete it.
     if (state.getCurrentWorldName() != null) {
-      World worldToDelete = Bukkit.getWorld(state.getCurrentWorldName());
-      if (worldToDelete != null) {
-        logger.info("Resetting: Deleting partially generated world " + state.getCurrentWorldName());
-        unloadAndDeleteWorld(worldToDelete, (success) -> {
+      File worldFolder = state.getCurrentWorldFolder();
+      if (worldFolder != null && worldFolder.exists()) {
+        logger.info("Resetting: Deleting partially generated world folder " + worldFolder.getAbsolutePath());
+        // Unload first if loaded
+        World world = Bukkit.getWorld(state.getCurrentWorldName());
+        if (world != null) {
+            Bukkit.unloadWorld(world, false);
+        }
+        FileUtils.deleteDirectoryWithRetry(worldFolder, logger, (success) -> {
             if (!success) {
-                logger.warning("Failed to delete world " + state.getCurrentWorldName() + " during reset.");
+                logger.warning("Failed to delete world folder during reset.");
             }
         });
       }
       state.setCurrentWorldName(null);
+      state.setCurrentWorldFolder(null);
     }
 
     state.setCurrentIndex(0);
@@ -140,6 +170,7 @@ public class GenerationTask {
     state.setStartTime(0);
     state.getFailedSeeds().clear();
     state.setCurrentStep("IDLE");
+    worldsInCurrentBatch = 0;
     saveState();
     logger.info("Generation progress reset");
   }
@@ -149,7 +180,7 @@ public class GenerationTask {
    */
   private void processNext() {
     if (interrupted || state.getCurrentIndex() >= seeds.size()) {
-      if (!interrupted) { // if not interrupted, that means we're done
+      if (!interrupted) {
         logger.info("All " + seeds.size() + " worlds generated successfully!");
         state.setCurrentStep("COMPLETED");
         saveState();
@@ -161,54 +192,44 @@ public class GenerationTask {
     long seed = seeds.get(state.getCurrentIndex());
     logger.info("Processing seed " + seed + " (" + (state.getCurrentIndex() + 1) + "/" + seeds.size() + ")");
 
-    try {
-      state.setCurrentStep("CREATING_WORLD");
-      World tempworld = createWorld(seed);
-      state.setCurrentWorldName(tempworld.getName());
-      saveState();
-
-      generateChunks(tempworld, () -> {
-        if (interrupted) return;
-
-        try {
+    CompletableFuture.runAsync(() -> {
+          state.setCurrentStep("CREATING_WORLD");
+          World tempworld = createWorld(seed);
+          state.setCurrentWorldName(tempworld.getName());
+          state.setCurrentWorldFolder(tempworld.getWorldFolder());
+          saveState();
+        }, Bukkit.getScheduler().getMainThreadExecutor(plugin))
+        .thenCompose(v -> generateChunks())
+        .thenAcceptAsync(world -> {
           state.setCurrentStep("ADJUSTING_SPAWN");
-          checkSpawn(tempworld);
-          
+          checkSpawn(world);
+
           state.setCurrentStep("BUILDING_CAGE");
-          buildCage(tempworld);
+          buildCage(world);
           saveState();
 
-          state.setCurrentStep("EXPORTING");
-          saveAndExportToSlime(tempworld, seed, () -> {
-            if (interrupted) return;
-
-            state.setCurrentStep("CLEANING_UP");
-            unloadAndDeleteWorld(tempworld, (success) -> {
-                if (success) {
-                    state.setSuccessCount(state.getSuccessCount() + 1);
-                    state.setCurrentWorldName(null);
-                    retryCount = 0;
-                    moveOn();
-                } else {
-                    logger.severe("Cleanup failed for " + tempworld.getName() + ". Stopping to prevent corrupt state.");
-                    plugin.running = false;
-                }
-            });
-          });
-
-        } catch (Exception e) {
-          handleError(e, "post-generation steps");
-        }
-      });
-
-    } catch (Exception e) {
-      handleError(e, "creating/generating world");
-    }
+          state.setCurrentStep("UNLOADING");
+          Bukkit.unloadWorld(world, true);
+          logger.info("World saved and unloaded: " + world.getName());
+        }, Bukkit.getScheduler().getMainThreadExecutor(plugin))
+        .thenCompose(v -> exportToSlime(seed))
+        .thenCompose(v -> cleanup())
+        .thenRun(this::moveOn)
+        .exceptionally(ex -> {
+          if (ex instanceof Exception e) {
+            handleError(e);
+          } else {
+            handleError(new RuntimeException(ex));
+          }
+          return null;
+        });
   }
 
-  private void handleError(Exception e, String context) {
+  private void handleError(Exception e) {
+    if (interrupted) return;
+
     ErrorHandler.ErrorCategory category = errorHandler.categorize(e);
-    errorHandler.handleError(e, context);
+    errorHandler.handleError(e, "generation pipeline");
 
     if (category == ErrorHandler.ErrorCategory.FATAL) {
       logger.severe("Fatal error encountered. Stopping generation.");
@@ -231,12 +252,26 @@ public class GenerationTask {
   }
 
   /**
-   * Advances to the next seed with a delay
+   * Advances to the next seed with a delay, respecting batch settings
    */
   private void moveOn() {
     state.setCurrentIndex(state.getCurrentIndex() + 1);
+    worldsInCurrentBatch++;
     saveState();
-    scheduledTask = Bukkit.getScheduler().runTaskLater(plugin, this::processNext, config.getWorldDelayTicks());
+
+    long delay;
+    if (worldsInCurrentBatch >= config.getWorldsPerBatch()) {
+        worldsInCurrentBatch = 0;
+        delay = config.getPauseBetweenBatches() * 20L; // Convert seconds to ticks
+        logger.info("Batch complete. Pausing for " + config.getPauseBetweenBatches() + " seconds...");
+        state.setCurrentStep("BATCH_PAUSE");
+    } else {
+        delay = config.getWorldDelayTicks();
+        state.setCurrentStep("WAITING");
+    }
+    saveState();
+
+    scheduledTask = Bukkit.getScheduler().runTaskLater(plugin, this::processNext, delay);
   }
 
   /**
@@ -257,15 +292,20 @@ public class GenerationTask {
 
   /**
    * Generates chunks using Chunky API
-   * @param world The world to generate chunks in
-   * @param onComplete Callback to run when generation completes
+   * @return Future that completes when generation is done
    */
-  private void generateChunks(World world, Runnable onComplete) {
-    int radius = config.getGenerationRadius();
+  private CompletableFuture<World> generateChunks() {
+    World world = Bukkit.getWorld(state.getCurrentWorldName());
+    if (world == null) {
+        return CompletableFuture.failedFuture(new RuntimeException("World not found: " + state.getCurrentWorldName()));
+    }
 
+    int radius = config.getGenerationRadius();
     logger.info("Starting chunk generation (radius: " + radius + ")");
     state.setCurrentStep("GENERATING_CHUNKS");
     saveState();
+    
+    chunkyFuture = new CompletableFuture<>();
     
     chunky.startTask(
         world.getName(),
@@ -275,13 +315,8 @@ public class GenerationTask {
         radius,
         radius,
         "concentric");
-
-    chunky.onGenerationComplete(event -> {
-      if (event.world().equals(world.getName())) {
-        logger.info("Chunk generation completed for " + event.world());
-        Bukkit.getScheduler().runTask(plugin, onComplete);
-      }
-    });
+    
+    return chunkyFuture;
   }
 
   /**
@@ -315,59 +350,70 @@ public class GenerationTask {
 
   /**
    * Converts the vanilla world to Slime format and exports it
-   * @param world The temporary vanilla world
    * @param seed The seed value (used for naming)
-   * @param onComplete Callback to run when conversion completes
+   * @return Future that completes when conversion is done
    */
-  private void saveAndExportToSlime(World world, long seed, Runnable onComplete) {
-    world.save();
-    logger.info("World saved: " + world.getName());
+  private CompletableFuture<Void> exportToSlime(long seed) {
+    state.setCurrentStep("EXPORTING");
+    saveState();
 
+    CompletableFuture<Void> future = new CompletableFuture<>();
     Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
       try {
-        File tempWorldDir = world.getWorldFolder();
+        File tempWorldDir = state.getCurrentWorldFolder();
         File exportDir = new File(config.getExportPath());
 
         if (!exportDir.exists() && !exportDir.mkdirs()) {
-          logger.log(Level.SEVERE, "Could not create export directory: " + exportDir.getAbsolutePath());
-          Bukkit.getScheduler().runTask(plugin, onComplete);
+          future.completeExceptionally(new IOException("Could not create export directory: " + exportDir.getAbsolutePath()));
           return;
         }
 
         SlimeLoader loader = new FileLoader(exportDir);
         SlimeWorld slimeWorld = slimeAPI.readVanillaWorld(tempWorldDir, String.valueOf(seed), loader);
+        slimeAPI.saveWorld(slimeWorld);
 
         logger.info("Converted and exported SlimeWorld: " + slimeWorld.getName() + " to " + exportDir.getAbsolutePath());
-        Bukkit.getScheduler().runTask(plugin, onComplete);
+        future.complete(null);
       } catch (IOException |
                RuntimeException |
                InvalidWorldException |
                WorldTooBigException |
                WorldAlreadyExistsException |
                WorldLoadedException e) {
-        logger.log(java.util.logging.Level.SEVERE, "Failed to convert/export world for seed " + seed, e);
-        Bukkit.getScheduler().runTask(plugin, onComplete);
+        future.completeExceptionally(e);
       }
     });
+    return future;
   }
 
   /**
-   * Unloads and deletes the temporary vanilla world
-   * @param world The world to remove
-   * @param callback Callback with success status
+   * Deletes the temporary vanilla world folder
+   * @return Future that completes when deletion is done
    */
-  public void unloadAndDeleteWorld(World world, java.util.function.Consumer<Boolean> callback) {
-    String worldName = world.getName();
-    File worldFolder = world.getWorldFolder();
+  private CompletableFuture<Void> cleanup() {
+    state.setCurrentStep("CLEANING_UP");
+    saveState();
 
-    Bukkit.unloadWorld(world, false);
-    logger.info("World unloaded: " + worldName);
+    CompletableFuture<Void> future = new CompletableFuture<>();
+    String worldName = state.getCurrentWorldName();
+    File worldFolder = state.getCurrentWorldFolder();
 
-    Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
-        FileUtils.deleteDirectoryWithRetry(worldFolder, logger, (success) -> {
-            Bukkit.getScheduler().runTask(plugin, () -> callback.accept(success));
-        });
-    });
+    Bukkit.getScheduler().runTaskAsynchronously(plugin, () ->
+        FileUtils.deleteDirectoryWithRetry(worldFolder, logger, (success) ->
+            Bukkit.getScheduler().runTask(plugin, () -> {
+              if (success) {
+                state.setSuccessCount(state.getSuccessCount() + 1);
+                state.setCurrentWorldName(null);
+                state.setCurrentWorldFolder(null);
+                retryCount = 0;
+                future.complete(null);
+              } else {
+                future.completeExceptionally(new RuntimeException("Cleanup failed for " + worldName));
+              }
+            })
+        )
+    );
+    return future;
   }
 
   private void saveState() {

@@ -8,4 +8,7 @@ cage-building:
   cage-material: PURPLE_STAINED_GLASS
   cage-radius: 4
   cage-height: 3
+batch-settings:
+  worlds-per-batch: 10
+  pause-between-batches: 60
 world-delay-ticks: 40

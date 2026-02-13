@@ -17,6 +17,8 @@ ConfigManager {
   private int cageRadius;
   private int cageHeight;
   private long worldDelayTicks;
+  private int worldsPerBatch;
+  private long pauseBetweenBatches;
 
   public ConfigManager(WorldPregenerator plugin) {
     this.plugin = plugin;
@@ -83,6 +85,18 @@ ConfigManager {
         plugin.getLogger().warning("world-delay-ticks cannot be negative: " + worldDelayTicks + ". Defaulting to 40.");
         worldDelayTicks = 40L;
     }
+
+    worldsPerBatch = plugin.getConfig().getInt("batch-settings.worlds-per-batch", 10);
+    if (worldsPerBatch <= 0) {
+        plugin.getLogger().warning("worlds-per-batch must be positive: " + worldsPerBatch + ". Defaulting to 10.");
+        worldsPerBatch = 10;
+    }
+
+    pauseBetweenBatches = plugin.getConfig().getLong("batch-settings.pause-between-batches", 60L);
+    if (pauseBetweenBatches < 0) {
+        plugin.getLogger().warning("pause-between-batches cannot be negative: " + pauseBetweenBatches + ". Defaulting to 60.");
+        pauseBetweenBatches = 60L;
+    }
   }
 
   public int getGenerationRadius() {
@@ -109,6 +123,10 @@ ConfigManager {
 
   public long getWorldDelayTicks() { return worldDelayTicks; }
 
+  public int getWorldsPerBatch() { return worldsPerBatch; }
+
+  public long getPauseBetweenBatches() { return pauseBetweenBatches; }
+
   @Override
   public String toString() {
     return "generation-radius: " + generationRadius + "\n" +
@@ -121,6 +139,9 @@ ConfigManager {
         "  cage-material: " + cageMaterial + "\n" +
         "  cage-radius: " + cageRadius + "\n" +
         "  cage-height: " + cageHeight + "\n" +
+        "batch-settings:\n" +
+        "  worlds-per-batch: " + worldsPerBatch + "\n" +
+        "  pause-between-batches: " + pauseBetweenBatches + "\n" +
         "world-delay-ticks: " + worldDelayTicks;
   }
 }
