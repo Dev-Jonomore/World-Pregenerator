@@ -25,7 +25,7 @@ public class GenerationTask {
   private final WorldPregenerator plugin;
   private final java.util.logging.Logger logger;
   private final ConfigManager config;
-  private final List<Long> seeds;
+  private final List<SeedEntry> seeds;
   private final ChunkyAPI chunky;
   private final AdvancedSlimePaperAPI slimeAPI;
   private final SpawnAdjuster spawnAdjuster;
@@ -33,6 +33,7 @@ public class GenerationTask {
   private final ErrorHandler errorHandler;
   private final GenerationState state;
   private final File stateFile;
+  private final File metadataFile;
 
   private int retryCount = 0;
   private int worldsInCurrentBatch = 0;
@@ -43,17 +44,18 @@ public class GenerationTask {
   /**
    * Constructor for GenerationTask
    * @param plugin The main plugin instance
-   * @param seeds List of seed values to generate worlds from
+   * @param seeds List of seed entries to generate worlds from
    * @param chunky ChunkyAPI instance for chunk generation
    * @param state The generation state to use/resume
    */
-  public GenerationTask(WorldPregenerator plugin, List<Long> seeds, ChunkyAPI chunky, GenerationState state) {
+  public GenerationTask(WorldPregenerator plugin, List<SeedEntry> seeds, ChunkyAPI chunky, GenerationState state) {
     this.plugin = plugin;
     this.config = plugin.config;
     this.logger = plugin.getLogger();
     this.seeds = seeds;
     this.state = state;
     this.stateFile = new File(plugin.getDataFolder(), GenerationConstants.STATE_FILE_NAME);
+    this.metadataFile = new File(plugin.getDataFolder(), GenerationConstants.METADATA_FILE_NAME);
 
     this.chunky = chunky;
     this.slimeAPI = AdvancedSlimePaperAPI.instance();
@@ -70,6 +72,15 @@ public class GenerationTask {
     );
 
     this.state.setTotalSeeds(seeds.size());
+
+    // Initialize metadata file with header if it doesn't exist
+    if (!metadataFile.exists()) {
+        try {
+            java.nio.file.Files.writeString(metadataFile.toPath(), "seed,coordinate_hint,direction_hint,times_played,difficulty\n");
+        } catch (IOException e) {
+            logger.log(Level.SEVERE, "Failed to create metadata file", e);
+        }
+    }
 
     // Register Chunky listener once
     this.chunky.onGenerationComplete(event -> {
@@ -189,12 +200,12 @@ public class GenerationTask {
       return;
     }
 
-    long seed = seeds.get(state.getCurrentIndex());
-    logger.info("Processing seed " + seed + " (" + (state.getCurrentIndex() + 1) + "/" + seeds.size() + ")");
+    SeedEntry seedEntry = seeds.get(state.getCurrentIndex());
+    logger.info("Processing seed " + seedEntry.seed() + " (" + (state.getCurrentIndex() + 1) + "/" + seeds.size() + ")");
 
     CompletableFuture.runAsync(() -> {
           state.setCurrentStep("CREATING_WORLD");
-          World tempworld = createWorld(seed);
+          World tempworld = createWorld(seedEntry);
           state.setCurrentWorldName(tempworld.getName());
           state.setCurrentWorldFolder(tempworld.getWorldFolder());
           saveState();
@@ -203,6 +214,10 @@ public class GenerationTask {
         .thenAcceptAsync(world -> {
           state.setCurrentStep("ADJUSTING_SPAWN");
           checkSpawn(world);
+          
+          // Calculate and save metadata
+          String direction = calculateDirection(seedEntry, world.getSpawnLocation());
+          saveMetadata(seedEntry, direction);
 
           state.setCurrentStep("BUILDING_CAGE");
           buildCage(world);
@@ -212,7 +227,7 @@ public class GenerationTask {
           Bukkit.unloadWorld(world, true);
           logger.info("World saved and unloaded: " + world.getName());
         }, Bukkit.getScheduler().getMainThreadExecutor(plugin))
-        .thenCompose(v -> exportToSlime(seed))
+        .thenCompose(v -> exportToSlime(seedEntry))
         .thenCompose(v -> cleanup())
         .thenRun(this::moveOn)
         .exceptionally(ex -> {
@@ -238,17 +253,44 @@ public class GenerationTask {
       saveState();
     } else if (category == ErrorHandler.ErrorCategory.RECOVERABLE && retryCount < GenerationConstants.MAX_RETRIES_PER_SEED) {
       retryCount++;
-      logger.info("Recoverable error. Retrying seed " + seeds.get(state.getCurrentIndex()) + " (Attempt " + (retryCount + 1) + ")");
+      logger.info("Recoverable error. Retrying seed " + seeds.get(state.getCurrentIndex()).seed() + " (Attempt " + (retryCount + 1) + ")");
       state.setCurrentStep("RETRYING");
       saveState();
       scheduledTask = Bukkit.getScheduler().runTaskLater(plugin, this::processNext, config.getWorldDelayTicks());
     } else {
       state.setFailureCount(state.getFailureCount() + 1);
-      state.addFailedSeed(seeds.get(state.getCurrentIndex()));
-      logger.warning("Skipping seed " + seeds.get(state.getCurrentIndex()) + " due to " + category + " error.");
+      SeedEntry seedEntry = seeds.get(state.getCurrentIndex());
+      state.addFailedSeed(new FailedSeedEntry(seedEntry, e.getMessage() != null ? e.getMessage() : e.toString()));
+      logger.warning("Skipping seed " + seedEntry.seed() + " due to " + category + " error.");
       retryCount = 0;
       moveOn();
     }
+  }
+
+  private String calculateDirection(SeedEntry seed, Location spawn) {
+      double deltaX = seed.hintX() - spawn.getX();
+      double deltaZ = seed.hintZ() - spawn.getZ();
+      
+      if (Math.abs(deltaX) > Math.abs(deltaZ)) {
+          return deltaX > 0 ? "East" : "West";
+      } else {
+          return deltaZ > 0 ? "South" : "North";
+      }
+  }
+
+  private void saveMetadata(SeedEntry seed, String direction) {
+      // Format: id (seed), coordinate_hint, direction_hint, times_played, difficulty
+      String hint = String.format("[%d, ~ %d]", seed.hintX(), seed.hintZ());
+      String record = String.format("%d,\"%s\",%s,0,Easy\n", seed.seed(), hint, direction);
+      
+      Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
+          try {
+              java.nio.file.Files.writeString(metadataFile.toPath(), record, 
+                  java.nio.file.StandardOpenOption.APPEND, java.nio.file.StandardOpenOption.CREATE);
+          } catch (IOException e) {
+              logger.log(Level.SEVERE, "Failed to save metadata for seed " + seed.seed(), e);
+          }
+      });
   }
 
   /**
@@ -276,17 +318,17 @@ public class GenerationTask {
 
   /**
    * Creates a temporary vanilla world for chunk generation
-   * @param seed The seed value for world generation
+   * @param seedEntry The seed entry for world generation
    * @return The created World object
    */
-  private World createWorld(long seed) {
+  private World createWorld(SeedEntry seedEntry) {
     String worldName = "world_" + state.getCurrentIndex();
 
     World world = new WorldCreator(worldName)
-                      .seed(seed)
+                      .seed(seedEntry.seed())
                       .environment(World.Environment.NORMAL)
                       .createWorld();
-    logger.info("Created world: " + worldName + " (seed: " + seed + ")");
+    logger.info("Created world: " + worldName + " (seed: " + seedEntry.seed() + ")");
     return world;
   }
 
@@ -350,10 +392,10 @@ public class GenerationTask {
 
   /**
    * Converts the vanilla world to Slime format and exports it
-   * @param seed The seed value (used for naming)
+   * @param seedEntry The seed entry (used for naming)
    * @return Future that completes when conversion is done
    */
-  private CompletableFuture<Void> exportToSlime(long seed) {
+  private CompletableFuture<Void> exportToSlime(SeedEntry seedEntry) {
     state.setCurrentStep("EXPORTING");
     saveState();
 
@@ -369,7 +411,7 @@ public class GenerationTask {
         }
 
         SlimeLoader loader = new FileLoader(exportDir);
-        SlimeWorld slimeWorld = slimeAPI.readVanillaWorld(tempWorldDir, String.valueOf(seed), loader);
+        SlimeWorld slimeWorld = slimeAPI.readVanillaWorld(tempWorldDir, String.valueOf(seedEntry.seed()), loader);
         slimeAPI.saveWorld(slimeWorld);
 
         logger.info("Converted and exported SlimeWorld: " + slimeWorld.getName() + " to " + exportDir.getAbsolutePath());

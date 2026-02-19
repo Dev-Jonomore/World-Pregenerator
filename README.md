@@ -6,7 +6,8 @@ A Paper/Bukkit plugin that batch-generates Minecraft worlds from a seed list, co
 
 1.  **Dependencies**: This plugin requires the following plugins to be installed on your server:
     *   [Chunky](https://www.spigotmc.org/resources/chunky.81534/) (v1.3.38+)
-    *   [AdvancedSlimePaper](https://www.spigotmc.org/resources/advancedslimepaper.9 AdvancedSlimePaper) (v4.0.0+)
+    *   The `asp-server.jar`
+    *   At least 8 GB of RAM
 2.  **Download**: Download the latest release of `WorldPregenerator.jar` from the releases page.
 3.  **Install**: Place the `WorldPregenerator.jar` file into your server's `plugins` directory.
 4.  **Restart**: Restart your server to generate the default configuration.
@@ -14,7 +15,7 @@ A Paper/Bukkit plugin that batch-generates Minecraft worlds from a seed list, co
 ## Quick Start
 
 1.  **Configure `config.yml`**: Open `plugins/WorldPregenerator/config.yml` and set `export-path` to your desired output directory for slime worlds.
-2.  **Create `seeds.txt`**: Create a file named `seeds.txt` (or as configured in `seeds-file`) and add one seed (long integer) per line.
+2.  **Create `seeds.txt`**: Create a file named `seeds.txt` (or as configured in `seeds-file`) and add one seed (formatted as "- ### [X, ~ Z]" where `###` is the seed and `[X, ~ Z]` is an x and z coordinate with a y placeholder in between) per line.
 3.  **Start Generation**: Use the command `/wp start` to begin the generation process.
 4.  **Check Progress**: Use `/wp status` to monitor the progress.
 5.  **Stop Generation**: Use `/wp stop` to pause the generation.
@@ -37,8 +38,10 @@ The `config.yml` file contains the following settings:
 
 ## Command Reference
 
+*   `/wp help`: Shows a list of these commands.
 *   `/wp start`: Starts or resumes the world generation task.
 *   `/wp stop`: Stops the current generation task.
+*   `/wp retry`: Retries failed seeds.
 *   `/wp reset`: Stops generation and deletes all exported worlds. Requires confirmation.
 *   `/wp confirm`: Confirms the reset operation.
 *   `/wp status`: Shows the current status of the generation task.

@@ -16,7 +16,7 @@ public class GenerationState {
     private int successCount = 0;
     private int failureCount = 0;
     private long startTime = 0;
-    private List<Long> failedSeeds = new ArrayList<>();
+    private List<FailedSeedEntry> failedSeeds = new ArrayList<>();
     private String currentStep = "IDLE";
     private String currentWorldName = null;
     private File currentWorldFolder = null;
@@ -57,8 +57,8 @@ public class GenerationState {
     public long getStartTime() { return startTime; }
     public void setStartTime(long startTime) { this.startTime = startTime; }
 
-    public List<Long> getFailedSeeds() { return failedSeeds; }
-    public void addFailedSeed(long seed) { this.failedSeeds.add(seed); }
+    public List<FailedSeedEntry> getFailedSeeds() { return failedSeeds; }
+    public void addFailedSeed(FailedSeedEntry entry) { this.failedSeeds.add(entry); }
 
     public String getCurrentStep() { return currentStep; }
     public void setCurrentStep(String currentStep) { this.currentStep = currentStep; }
