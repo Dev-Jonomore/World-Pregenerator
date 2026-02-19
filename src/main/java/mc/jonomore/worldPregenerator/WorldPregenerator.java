@@ -29,7 +29,7 @@ public final class WorldPregenerator extends JavaPlugin {
 
     if (task == null) {
       getLogger().info("No task found, creating a new one.");
-      List<Long> seeds = readSeeds();
+      List<SeedEntry> seeds = readSeeds();
       if (seeds.isEmpty()) {
         getLogger().warning("No seeds found in file!");
         return;
@@ -47,6 +47,41 @@ public final class WorldPregenerator extends JavaPlugin {
       task = new GenerationTask(this, seeds, chunky, state);
     }
 
+    running = true;
+    task.start();
+  }
+
+  public void retry() {
+    if (running) {
+      getLogger().warning("Generation already running!");
+      return;
+    }
+
+    if (state == null || state.getFailedSeeds().isEmpty()) {
+      getLogger().warning("No failed seeds to retry!");
+      return;
+    }
+
+    List<SeedEntry> failedSeeds = state.getFailedSeeds().stream()
+            .map(FailedSeedEntry::seedEntry)
+            .toList();
+    getLogger().info("Retrying generation for " + failedSeeds.size() + " failed seeds.");
+
+    ChunkyAPI chunky = getServer().getServicesManager().load(ChunkyAPI.class);
+    if (chunky == null) {
+      getLogger().severe("Chunky API not found! Make sure Chunky plugin is installed.");
+      return;
+    }
+
+    // Reset state for the retry run
+    state.getFailedSeeds().clear();
+    state.setCurrentIndex(0);
+    state.setSuccessCount(0);
+    state.setFailureCount(0);
+    state.setStartTime(System.currentTimeMillis());
+    state.setCurrentStep("RETRYING_FAILED");
+
+    task = new GenerationTask(this, failedSeeds, chunky, state);
     running = true;
     task.start();
   }
@@ -78,14 +113,32 @@ public final class WorldPregenerator extends JavaPlugin {
       }
   }
 
-  private List<Long> readSeeds() {
-    try {
-      return Files.lines(Paths.get(config.getSeedsFile()))
-          .map(String::trim)
-          .filter(line -> !line.isEmpty())
-          .map(Long::parseLong)
-          .toList();
-    } catch (IOException | NumberFormatException e) {
+  private List<SeedEntry> readSeeds() {
+    // Expected format: "- XXX [X, ~ Z]" where XXX is seed, X is hintX, Z is hintZ
+    // Example: "- 12345 [100, ~ 200]"
+    java.util.regex.Pattern pattern = java.util.regex.Pattern.compile("^-\\s*(-?\\d+)\\s*\\[\\s*(-?\\d+)\\s*,\\s*~\\s*(-?\\d+)\\s*\\]$");
+    try (java.util.stream.Stream<String> lines = Files.lines(Paths.get(config.getSeedsFile()))) {
+        return lines.map(String::trim)
+            .filter(line -> !line.isEmpty())
+            .map(line -> {
+                java.util.regex.Matcher matcher = pattern.matcher(line);
+                if (matcher.find()) {
+                    try {
+                        long seed = Long.parseLong(matcher.group(1));
+                        int hintX = Integer.parseInt(matcher.group(2));
+                        int hintZ = Integer.parseInt(matcher.group(3));
+                        return new SeedEntry(seed, hintX, hintZ);
+                    } catch (NumberFormatException e) {
+                        getLogger().warning("Failed to parse numbers in line: " + line);
+                    }
+                } else {
+                    getLogger().warning("Line does not match seed pattern: " + line);
+                }
+                return null;
+            })
+            .filter(java.util.Objects::nonNull)
+            .toList();
+    } catch (IOException e) {
       getLogger().severe("Error reading seeds: " + e.getMessage());
       return Collections.emptyList();
     }
@@ -150,8 +203,10 @@ public final class WorldPregenerator extends JavaPlugin {
           try {
               state = GenerationState.load(stateFile);
               getLogger().info("Loaded generation state from " + GenerationConstants.STATE_FILE_NAME);
-          } catch (IOException e) {
-              getLogger().log(Level.SEVERE, "Failed to load generation state", e);
+          } catch (Exception e) {
+              getLogger().log(Level.SEVERE, "Failed to load generation state. The state file might be corrupt or using an older format.", e);
+              // We could potentially rename the corrupt file here to prevent infinite loop
+              stateFile.renameTo(new File(getDataFolder(), GenerationConstants.STATE_FILE_NAME + ".corrupt"));
           }
       }
   }

@@ -20,6 +20,16 @@ public class WPCommands {
 
   public static LiteralCommandNode<CommandSourceStack> createCommand(WorldPregenerator wp) {
     return Commands.literal("worldpregenerator")
+        .executes(ctx -> {
+            sendHelp(ctx.getSource().getSender());
+            return Command.SINGLE_SUCCESS;
+        })
+        .then(Commands.literal("help")
+            .executes(ctx -> {
+                sendHelp(ctx.getSource().getSender());
+                return Command.SINGLE_SUCCESS;
+            })
+        )
         .then(Commands.literal("start")
             .executes(ctx -> {
               wp.start();
@@ -39,6 +49,12 @@ public class WPCommands {
             .executes(ctx -> {
               wp.stop();
               return Command.SINGLE_SUCCESS;
+            })
+        )
+        .then(Commands.literal("retry")
+            .executes(ctx -> {
+                wp.retry();
+                return Command.SINGLE_SUCCESS;
             })
         )
         .then(Commands.literal("status")
@@ -74,8 +90,8 @@ public class WPCommands {
                 }
 
                 String failedList = state.getFailedSeeds().stream()
-                    .map(String::valueOf)
-                    .collect(Collectors.joining(", "));
+                    .map(entry -> entry.seedEntry().seed() + " (" + entry.reason() + ")")
+                    .collect(Collectors.joining("<newline>"));
                 
                 ctx.getSource().getSender().sendMessage(MiniMessage.miniMessage().deserialize(
                     "<red>Failed Seeds (" + state.getFailedSeeds().size() + "):<newline><gray>" + failedList
@@ -136,6 +152,23 @@ public class WPCommands {
                 )
             )
         ).build();
+  }
+
+  private static void sendHelp(org.bukkit.command.CommandSender sender) {
+    sender.sendMessage(MiniMessage.miniMessage().deserialize(
+        "<gold>=== WorldPregenerator Help ===<newline>" +
+        "<yellow>/wp start <gray>- Start or resume generation<newline>" +
+        "<yellow>/wp stop <gray>- Stop current generation<newline>" +
+        "<yellow>/wp status <gray>- Show current progress<newline>" +
+        "<yellow>/wp failed <gray>- Show seeds that failed with reasons<newline>" +
+        "<yellow>/wp retry <gray>- Retry only failed seeds<newline>" +
+        "<yellow>/wp dryrun <gray>- Validate config without generating<newline>" +
+        "<yellow>/wp reload <gray>- Reload configuration from disk<newline>" +
+        "<yellow>/wp info <gray>- Show current config values<newline>" +
+        "<yellow>/wp reset <gray>- Delete all exported worlds and reset progress<newline>" +
+        "<yellow>/wp config <setting> <value> <gray>- Change a config value<newline>" +
+        "<yellow>/wp help <gray>- Show this help message"
+    ));
   }
 
   private static String formatTime(long millis) {
