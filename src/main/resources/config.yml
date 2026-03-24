@@ -1,6 +1,6 @@
 generation-radius: 1200
-export-path: "/mnt/hgfs/Worlds"
-seeds-file: "/mnt/hgfs/Seeds/seeds.txt"
+export-path: "/mnt/worlds"
+seeds-file: "/mnt/seeds/seeds.txt"
 spawn-adjustment:
   maxSearchRadius: 100
   maxVerticalScan: 128

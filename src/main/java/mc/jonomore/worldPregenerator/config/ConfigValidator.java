@@ -1,6 +1,6 @@
-package mc.jonomore.worldPregenerator;
+package mc.jonomore.worldPregenerator.config;
 
-import com.infernalsuite.asp.api.AdvancedSlimePaperAPI;
+import mc.jonomore.worldPregenerator.WorldPregenerator;
 import org.bukkit.Bukkit;
 import org.popcraft.chunky.api.ChunkyAPI;
 
@@ -67,13 +67,6 @@ public class ConfigValidator {
             results.add("<red> - FAILED: Chunky API not found.");
         } else {
             results.add("<green> - SUCCESS: Chunky API found (Version " + chunky.version() + ")");
-        }
-
-        try {
-            AdvancedSlimePaperAPI.instance();
-            results.add("<green> - SUCCESS: AdvancedSlimePaper API found.");
-        } catch (NoClassDefFoundError | Exception e) {
-            results.add("<red> - FAILED: AdvancedSlimePaper API not found.");
         }
 
         return results;

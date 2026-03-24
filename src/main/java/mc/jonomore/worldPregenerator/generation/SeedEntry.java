@@ -1,4 +1,4 @@
-package mc.jonomore.worldPregenerator;
+package mc.jonomore.worldPregenerator.generation;
 
 /**
  * Represents a seed with its coordinate hints.

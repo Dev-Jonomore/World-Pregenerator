@@ -1,5 +1,11 @@
 package mc.jonomore.worldPregenerator;
 
+import mc.jonomore.worldPregenerator.config.ConfigManager;
+import mc.jonomore.worldPregenerator.generation.FailedSeedEntry;
+import mc.jonomore.worldPregenerator.generation.GenerationState;
+import mc.jonomore.worldPregenerator.generation.GenerationTask;
+import mc.jonomore.worldPregenerator.generation.SeedEntry;
+import mc.jonomore.worldPregenerator.util.FileUtils;
 import io.papermc.paper.plugin.lifecycle.event.types.LifecycleEvents;
 import org.bukkit.Bukkit;
 import org.bukkit.World;
@@ -16,10 +22,10 @@ import java.util.logging.Level;
 
 public final class WorldPregenerator extends JavaPlugin {
 
-  ConfigManager config;
-  boolean running = false;
-  GenerationTask task = null;
+  public ConfigManager config;
+  public boolean running = false;
   GenerationState state = null;
+  private GenerationTask task = null;
 
   public void start() {
     if (running) {
@@ -116,7 +122,7 @@ public final class WorldPregenerator extends JavaPlugin {
   private List<SeedEntry> readSeeds() {
     // Expected format: "- XXX [X, ~ Z]" where XXX is seed, X is hintX, Z is hintZ
     // Example: "- 12345 [100, ~ 200]"
-    java.util.regex.Pattern pattern = java.util.regex.Pattern.compile("^-\\s*(-?\\d+)\\s*\\[\\s*(-?\\d+)\\s*,\\s*~\\s*(-?\\d+)\\s*\\]$");
+    java.util.regex.Pattern pattern = java.util.regex.Pattern.compile("^-\\s*(-?\\d+)\\s*\\[\\s*(-?\\d+)\\s*,\\s*~\\s*(-?\\d+)\\s*]$");
     try (java.util.stream.Stream<String> lines = Files.lines(Paths.get(config.getSeedsFile()))) {
         return lines.map(String::trim)
             .filter(line -> !line.isEmpty())
