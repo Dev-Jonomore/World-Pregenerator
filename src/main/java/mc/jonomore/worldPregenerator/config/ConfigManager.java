@@ -11,6 +11,7 @@ ConfigManager {
   // Cached config values
   private int generationRadius;
   private String exportPath;
+  private String serverId;
   private String seedsFile;
   private int maxSearchRadius;
   private int maxVerticalScan;
@@ -37,6 +38,7 @@ ConfigManager {
     }
 
     exportPath = plugin.getConfig().getString("export-path", "exported_worlds");
+    serverId = plugin.getConfig().getString("server-id", "default");
     File exportDir = new File(exportPath);
     if (!exportDir.exists() && !exportDir.mkdirs()) {
         plugin.getLogger().warning("export-path directory could not be created or found: " + exportPath);
@@ -108,6 +110,10 @@ ConfigManager {
     return exportPath;
   }
 
+  public String getServerId() {
+    return serverId;
+  }
+
   public String getSeedsFile() {
     return seedsFile;
   }
@@ -131,6 +137,7 @@ ConfigManager {
   @Override
   public String toString() {
     return "generation-radius: " + generationRadius + "\n" +
+        "server-id: " + serverId + "\n" +
         "export-path: " + exportPath + "\n" +
         "seeds-file: " + seedsFile + "\n" +
         "spawn-adjustment:\n" +

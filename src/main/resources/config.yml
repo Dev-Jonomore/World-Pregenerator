@@ -1,4 +1,5 @@
 generation-radius: 1200
+server-id: "server1"
 export-path: "/mnt/worlds"
 seeds-file: "/mnt/seeds/seeds.txt"
 spawn-adjustment:

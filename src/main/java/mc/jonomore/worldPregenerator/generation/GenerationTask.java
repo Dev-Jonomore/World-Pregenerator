@@ -7,6 +7,7 @@ import mc.jonomore.worldPregenerator.logic.CageBuilder;
 import mc.jonomore.worldPregenerator.logic.SpawnAdjuster;
 import mc.jonomore.worldPregenerator.util.FileUtils;
 import org.bukkit.Bukkit;
+import org.bukkit.Difficulty;
 import org.bukkit.Location;
 import org.bukkit.World;
 import org.bukkit.WorldCreator;
@@ -349,7 +350,12 @@ public class GenerationTask {
                       .seed(seedEntry.seed())
                       .environment(World.Environment.NORMAL)
                       .createWorld();
-    logger.info("Created world: " + worldName + " (seed: " + seedEntry.seed() + ")");
+    
+    if (world != null) {
+        world.setDifficulty(Difficulty.EASY);
+        logger.info("Created world: " + worldName + " (seed: " + seedEntry.seed() + ", difficulty: EASY)");
+    }
+    
     return world;
   }
 
@@ -431,7 +437,8 @@ public class GenerationTask {
           return;
         }
 
-        File zipFile = new File(exportDir, seedEntry.seed() + ".zip");
+        String fileName = seedEntry.seed() + "_" + config.getServerId() + ".zip";
+        File zipFile = new File(exportDir, fileName);
         Set<String> exclusions = Set.of("session.lock", "uid.dat");
         
         logger.info("Zipping world " + worldFolder.getName() + " to " + zipFile.getAbsolutePath());
