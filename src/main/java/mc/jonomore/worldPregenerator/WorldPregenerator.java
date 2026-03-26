@@ -35,11 +35,22 @@ public final class WorldPregenerator extends JavaPlugin {
 
     if (task == null) {
       getLogger().info("No task found, creating a new one.");
-      List<SeedEntry> seeds = readSeeds();
-      if (seeds.isEmpty()) {
+      List<SeedEntry> allSeeds = readSeeds();
+      if (allSeeds.isEmpty()) {
         getLogger().warning("No seeds found in file!");
         return;
       }
+      
+      java.util.Set<Long> completedSeeds = loadCompletedSeeds();
+      List<SeedEntry> seedsToProcess = allSeeds.stream()
+              .filter(s -> !completedSeeds.contains(s.seed()))
+              .toList();
+      
+      if (seedsToProcess.isEmpty()) {
+          getLogger().info("All seeds have already been completed according to completed.txt");
+          return;
+      }
+
       ChunkyAPI chunky = getServer().getServicesManager().load(ChunkyAPI.class);
       if (chunky == null) {
         getLogger().severe("Chunky API not found! Make sure Chunky plugin is installed.");
@@ -50,7 +61,7 @@ public final class WorldPregenerator extends JavaPlugin {
           state = new GenerationState();
       }
       
-      task = new GenerationTask(this, seeds, chunky, state);
+      task = new GenerationTask(this, seedsToProcess, completedSeeds, chunky, state);
     }
 
     running = true;
@@ -79,6 +90,8 @@ public final class WorldPregenerator extends JavaPlugin {
       return;
     }
 
+    java.util.Set<Long> completedSeeds = loadCompletedSeeds();
+
     // Reset state for the retry run
     state.getFailedSeeds().clear();
     state.setCurrentIndex(0);
@@ -87,9 +100,32 @@ public final class WorldPregenerator extends JavaPlugin {
     state.setStartTime(System.currentTimeMillis());
     state.setCurrentStep("RETRYING_FAILED");
 
-    task = new GenerationTask(this, failedSeeds, chunky, state);
+    task = new GenerationTask(this, failedSeeds, completedSeeds, chunky, state);
     running = true;
     task.start();
+  }
+
+  private java.util.Set<Long> loadCompletedSeeds() {
+      File completedFile = new File(getDataFolder(), GenerationConstants.COMPLETED_SEEDS_FILE_NAME);
+      if (!completedFile.exists()) return new java.util.HashSet<>();
+      
+      try (java.util.stream.Stream<String> lines = Files.lines(completedFile.toPath())) {
+          return lines.map(String::trim)
+              .filter(line -> !line.isEmpty())
+              .map(line -> {
+                  try {
+                      return Long.parseLong(line);
+                  } catch (NumberFormatException e) {
+                      getLogger().warning("Failed to parse seed in completed.txt: " + line);
+                      return null;
+                  }
+              })
+              .filter(java.util.Objects::nonNull)
+              .collect(java.util.stream.Collectors.toSet());
+      } catch (IOException e) {
+          getLogger().log(Level.SEVERE, "Failed to load completed seeds", e);
+          return new java.util.HashSet<>();
+      }
   }
 
   public void stop() {

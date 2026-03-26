@@ -28,6 +28,7 @@ public class GenerationTask {
   private final java.util.logging.Logger logger;
   private final ConfigManager config;
   private final List<SeedEntry> seeds;
+  private final Set<Long> completedSeeds;
   private final ChunkyAPI chunky;
   private final SpawnAdjuster spawnAdjuster;
   private final CageBuilder cageBuilder;
@@ -46,14 +47,16 @@ public class GenerationTask {
    * Constructor for GenerationTask
    * @param plugin The main plugin instance
    * @param seeds List of seed entries to generate worlds from
+   * @param completedSeeds Set of already completed seeds for duplicate check
    * @param chunky ChunkyAPI instance for chunk generation
    * @param state The generation state to use/resume
    */
-  public GenerationTask(WorldPregenerator plugin, List<SeedEntry> seeds, ChunkyAPI chunky, GenerationState state) {
+  public GenerationTask(WorldPregenerator plugin, List<SeedEntry> seeds, Set<Long> completedSeeds, ChunkyAPI chunky, GenerationState state) {
     this.plugin = plugin;
     this.config = plugin.config;
     this.logger = plugin.getLogger();
     this.seeds = seeds;
+    this.completedSeeds = completedSeeds;
     this.state = state;
     this.stateFile = new File(plugin.getDataFolder(), GenerationConstants.STATE_FILE_NAME);
     this.completedSeedsFile = new File(plugin.getDataFolder(), GenerationConstants.COMPLETED_SEEDS_FILE_NAME);
@@ -202,21 +205,28 @@ public class GenerationTask {
           saveState();
         }, Bukkit.getScheduler().getMainThreadExecutor(plugin))
         .thenCompose(v -> generateChunks())
-        .thenAcceptAsync(world -> {
-          state.setCurrentStep("ADJUSTING_SPAWN");
-          checkSpawn(world);
-          
-          state.setCurrentStep("CREATING_METADATA");
-          String direction = calculateDirection(seedEntry, world.getSpawnLocation());
-          createManhuntYml(world, seedEntry, direction);
+        .thenAcceptAsync(w -> {
+          World world = w;
+          try {
+            state.setCurrentStep("ADJUSTING_SPAWN");
+            checkSpawn(world);
+            
+            state.setCurrentStep("CREATING_METADATA");
+            String direction = calculateDirection(seedEntry, world.getSpawnLocation());
+            createManhuntYml(world, seedEntry, direction);
 
-          state.setCurrentStep("BUILDING_CAGE");
-          buildCage(world);
-          
-          state.setCurrentStep("UNLOADING");
-          world.save();
-          Bukkit.unloadWorld(world, true);
-          logger.info("World saved and unloaded: " + world.getName());
+            state.setCurrentStep("BUILDING_CAGE");
+            buildCage(world);
+            
+            state.setCurrentStep("UNLOADING");
+            String worldName = world.getName();
+            world.save();
+            Bukkit.unloadWorld(world, true);
+            logger.info("World saved and unloaded: " + worldName);
+          } finally {
+            // Fix 1: Memory Leak - Null out world reference
+            world = null;
+          }
           saveState();
         }, Bukkit.getScheduler().getMainThreadExecutor(plugin))
         .thenCompose(v -> zipWorld(seedEntry))
@@ -224,7 +234,15 @@ public class GenerationTask {
             state.setCurrentStep("SAVING_SEED");
             writeCompletedSeed(seedEntry);
         }, Bukkit.getScheduler().getMainThreadExecutor(plugin))
-        .thenCompose(v -> cleanup())
+        .handle((v, ex) -> {
+            // Fix 7: CompletableFuture Error Handling - Ensure cleanup runs even on failure
+            if (ex != null) {
+                logger.log(Level.SEVERE, "Error in generation pipeline, proceeding to cleanup", ex);
+                return cleanup().thenCompose(cleanupResult -> CompletableFuture.<Void>failedFuture(ex));
+            }
+            return cleanup();
+        })
+        .thenCompose(f -> f)
         .thenRun(this::moveOn)
         .exceptionally(ex -> {
           if (ex instanceof Exception e) {
@@ -246,7 +264,9 @@ public class GenerationTask {
       logger.severe("Fatal error encountered. Stopping generation.");
       plugin.running = false;
       state.setCurrentStep("ERROR_FATAL");
-      saveState();
+      try {
+        state.save(stateFile);
+      } catch (IOException ignored) {}
     } else if (category == ErrorHandler.ErrorCategory.RECOVERABLE && retryCount < GenerationConstants.MAX_RETRIES_PER_SEED) {
       retryCount++;
       logger.info("Recoverable error. Retrying seed " + seeds.get(state.getCurrentIndex()).seed() + " (Attempt " + (retryCount + 1) + ")");
@@ -305,14 +325,17 @@ public class GenerationTask {
   }
 
   private void writeCompletedSeed(SeedEntry seed) {
-      Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
+      synchronized (completedSeedsFile) {
+          if (completedSeeds.contains(seed.seed())) return;
+          
           try {
               Files.writeString(completedSeedsFile.toPath(), seed.seed() + "\n", 
                   StandardOpenOption.APPEND, StandardOpenOption.CREATE);
+              completedSeeds.add(seed.seed());
           } catch (IOException e) {
               logger.log(Level.SEVERE, "Failed to write completed seed " + seed.seed(), e);
           }
-      });
+      }
   }
 
   /**
@@ -370,20 +393,32 @@ public class GenerationTask {
     }
 
     int radius = config.getGenerationRadius();
+    double centerX = world.getSpawnLocation().getX();
+    double centerZ = world.getSpawnLocation().getZ();
+    String worldName = world.getName();
+
     logger.info("Starting chunk generation (radius: " + radius + ")");
     state.setCurrentStep("GENERATING_CHUNKS");
     saveState();
     
     chunkyFuture = new CompletableFuture<>();
     
-    chunky.startTask(
-        world.getName(),
-        "square",
-        world.getSpawnLocation().getX(),
-        world.getSpawnLocation().getZ(),
-        radius,
-        radius,
-        "concentric");
+    // Fix 3: Watchdog Thread Dumps - Run chunky.startTask asynchronously
+    CompletableFuture.runAsync(() -> {
+        long start = System.currentTimeMillis();
+        chunky.startTask(
+            worldName,
+            "square",
+            centerX,
+            centerZ,
+            radius,
+            radius,
+            "concentric");
+        long duration = System.currentTimeMillis() - start;
+        if (duration > 100) {
+            logger.warning("Chunky startTask took " + duration + "ms");
+        }
+    }, Bukkit.getScheduler().getMainThreadExecutor(plugin));
     
     return chunkyFuture;
   }
@@ -444,7 +479,13 @@ public class GenerationTask {
         logger.info("Zipping world " + worldFolder.getName() + " to " + zipFile.getAbsolutePath());
         FileUtils.zipDirectory(worldFolder, zipFile, exclusions);
 
-        logger.info("Successfully zipped world: " + zipFile.getName());
+        // Fix 6: Zip Integrity Validation - Verify zip before source deletion
+        if (!FileUtils.validateZipFile(zipFile)) {
+            future.completeExceptionally(new IOException("Zip validation failed for: " + zipFile.getAbsolutePath()));
+            return;
+        }
+
+        logger.info("Successfully zipped and validated world: " + zipFile.getName());
         future.complete(null);
       } catch (IOException e) {
         future.completeExceptionally(e);
@@ -464,6 +505,11 @@ public class GenerationTask {
     CompletableFuture<Void> future = new CompletableFuture<>();
     String worldName = state.getCurrentWorldName();
     File worldFolder = state.getCurrentWorldFolder();
+
+    if (worldFolder == null || !worldFolder.exists()) {
+        future.complete(null);
+        return future;
+    }
 
     Bukkit.getScheduler().runTaskAsynchronously(plugin, () ->
         FileUtils.deleteDirectoryWithRetry(worldFolder, logger, (success) ->
@@ -487,7 +533,10 @@ public class GenerationTask {
     try {
       state.save(stateFile);
     } catch (IOException e) {
-      logger.log(Level.SEVERE, "Failed to save generation state", e);
+      // Fix 5: State File Save Failures - Stop on failure
+      logger.log(Level.SEVERE, "CRITICAL: State persistence failure - cannot continue safely", e);
+      stop();
+      throw new RuntimeException("State persistence failure", e);
     }
   }
 
