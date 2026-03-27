@@ -18,6 +18,30 @@ public class FileUtils {
   public static void zipDirectory(File sourceDir, File zipFile, Set<String> exclusions) throws IOException {
     try (ZipOutputStream zos = new ZipOutputStream(new FileOutputStream(zipFile))) {
       zip(sourceDir, sourceDir, zos, exclusions);
+    } catch (IOException e) {
+      if (zipFile.exists()) {
+        if (zipFile.delete()) {
+          System.err.println("Zip operation failed, removing corrupt zip file: " + zipFile.getAbsolutePath());
+        }
+      }
+      throw e;
+    }
+  }
+
+  public static boolean validateZipFile(File zipFile) {
+    if (!zipFile.exists() || !zipFile.isFile()) return false;
+    try (java.util.zip.ZipFile zf = new java.util.zip.ZipFile(zipFile)) {
+      java.util.Enumeration<? extends java.util.zip.ZipEntry> entries = zf.entries();
+      while (entries.hasMoreElements()) {
+        java.util.zip.ZipEntry entry = entries.nextElement();
+        try (java.io.InputStream is = zf.getInputStream(entry)) {
+          // Just read one byte to verify accessibility
+          is.read();
+        }
+      }
+      return true;
+    } catch (IOException e) {
+      return false;
     }
   }
 
