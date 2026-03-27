@@ -60,7 +60,8 @@ public final class WorldPregenerator extends JavaPlugin {
       if (state == null) {
           state = new GenerationState();
       }
-      
+
+      state.setCurrentIndex(0);
       task = new GenerationTask(this, seedsToProcess, completedSeeds, chunky, state);
     }
 
@@ -222,6 +223,7 @@ public final class WorldPregenerator extends JavaPlugin {
                             getLogger().log(Level.SEVERE, "Failed to cleanup partial world " + worldName, e);
                         }
                     });
+                    state.setCurrentStep("CREATE_WORLD");
                 }, 20L); // Wait a bit for server to fully start
             }
         }
