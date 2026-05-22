@@ -122,6 +122,7 @@ CHUNKY_REF.md
 CONVENTIONS.md
 GEMINI.md
 ISSUES.md
+*.tmp
 
 # Avoid ignoring Gradle wrapper jar file (.jar files are usually ignored)
 !gradle-wrapper.jar

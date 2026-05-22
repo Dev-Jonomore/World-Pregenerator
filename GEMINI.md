@@ -14,18 +14,17 @@ Paper/Bukkit plugin that batch-generates Minecraft worlds from seed lists, conve
 - When creating new features, consider the generation pipeline flow and where they fit
 
 ## Tech Stack
-- **Platform**: Paper 1.21 (Minecraft server)
-- **Language**: Java 21
+- **Platform**: Purpur 26.1 (Minecraft server)
+- **Language**: Java 25
 - **Build**: Gradle 
 - **Dependencies**:
   - Paper API 1.21.11-R0.1-SNAPSHOT
   - Chunky 1.3.38 (chunk generation)
-  - AdvancedSlimePaper 4.0.0-SNAPSHOT (world format conversion)
 
 ## Architecture
 
 ### Core Flow
-1. Read seeds from file → 2. Create vanilla world → 3. Generate chunks with Chunky → 4. Adjust spawn point → 5. Build protective cage → 6. Convert to SlimeWorld → 7. Export → 8. Delete vanilla world → 9. Repeat
+1. Read seeds from file → 2. Create vanilla world → 3. Generate chunks with Chunky → 4. Adjust spawn point → 5. Build protective cage → 6. Export → 7. Delete vanilla world → 8. Repeat
 
 ### Key Classes
 
@@ -66,7 +65,7 @@ Paper/Bukkit plugin that batch-generates Minecraft worlds from seed lists, conve
 ### World Generation Pipeline
 ```
 Seed → WorldCreator (vanilla) → Chunky API (chunk gen) → SpawnAdjuster (BFS) → 
-CageBuilder (structure) → SlimeAPI (conversion) → FileLoader (export) → 
+CageBuilder (structure) → FileLoader (export) → 
 Util.deleteDirectory (cleanup)
 ```
 
@@ -192,16 +191,6 @@ chunky.cancelTask(worldName);
 ### Further reading:
 
 @./CHUNKY_REF.md
-
-**AdvancedSlimePaper API** (world conversion):
-```java
-SlimeLoader loader = new FileLoader(exportDir);
-SlimeWorld slime = slimeAPI.readVanillaWorld(worldDir, worldName, loader);
-```
-
-### Further reading:
-
-@./ASP_REF.md
 
 **Paper Lifecycle Events** (modern command registration):
 ```java
