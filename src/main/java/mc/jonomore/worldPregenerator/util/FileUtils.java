@@ -288,11 +288,11 @@ public class FileUtils {
       } catch (IOException e) {
         attempts++;
         if (attempts >= MAX_RETRIES) {
-          logger.log(Level.SEVERE, "Failed to delete directory after " + MAX_RETRIES + " attempts: " + directory.getAbsolutePath(), e);
+          logger.log(Level.SEVERE, "Failed to delete directory after " + MAX_RETRIES + " attempts: " + directory.toAbsolutePath(), e);
           if (callback != null) callback.accept(false);
           return;
         }
-        logger.log(Level.WARNING, "Failed to delete directory (attempt " + attempts + "): " + directory.getAbsolutePath() + ". Retrying in " + backoff + "ms...");
+        logger.log(Level.WARNING, "Failed to delete directory (attempt " + attempts + "): " + directory.toAbsolutePath() + ". Retrying in " + backoff + "ms...");
         try {
           Thread.sleep(backoff);
         } catch (InterruptedException ie) {
