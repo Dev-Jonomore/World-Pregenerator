@@ -8,16 +8,19 @@ import mc.jonomore.worldPregenerator.logic.SpawnAdjuster;
 import mc.jonomore.worldPregenerator.util.FileUtils;
 import org.bukkit.*;
 import org.bukkit.scheduler.BukkitTask;
+import org.jspecify.annotations.NonNull;
 import org.popcraft.chunky.api.ChunkyAPI;
 import org.popcraft.chunky.api.event.task.GenerationCompleteEvent;
 
-import java.io.File;
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.StandardOpenOption;
+import java.io.*;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.*;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.util.List;
 import java.util.Set;
 import java.util.logging.Level;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipOutputStream;
 
 public class GenerationTask {
 
@@ -106,7 +109,7 @@ public class GenerationTask {
       if (world != null) Bukkit.unloadWorld(world, false);
       File worldFolder = state.getCurrentWorldFolder();
       if (worldFolder != null && worldFolder.exists()) {
-        FileUtils.deleteDirectoryWithRetry(worldFolder, logger, null);
+        FileUtils.deleteDirectoryWithRetry(worldFolder.toPath(), logger, null);
       }
     }
     state.setCurrentIndex(0);
@@ -260,10 +263,6 @@ public class GenerationTask {
           }
         }
 
-        // Metadata
-        SeedEntry seedEntry = seeds.get(state.getCurrentIndex());
-        createManhuntYml(world, seedEntry);
-
         // Cage
         cageBuilder.buildCage(world);
 
@@ -289,38 +288,82 @@ public class GenerationTask {
           throw new IOException("World folder not found for zipping: " + state.getCurrentWorldName());
         }
 
-        File exportDir = new File(config.getExportPath());
-        if (!exportDir.exists() && !exportDir.mkdirs()) throw new IOException("Failed to create export dir");
+        Path dimensionDir = FileUtils.resolveDimensionFolder(
+            worldFolder.toPath(),
+            state.getCurrentWorldName()
+        );
+        if (!Files.isDirectory(dimensionDir)) {
+          throw new IOException("Dimension folder not found: " + dimensionDir);
+        }
+
+        Path exportPath = Paths.get(config.getExportPath());
+        Files.createDirectories(exportPath);
 
         String zipFileName = seedEntry.seed() + "_" + config.getServerId() + ".zip";
-        File zipFile = new File(exportDir, zipFileName);
+        Path zipFile = exportPath.resolve(zipFileName);
 
         // Idempotency: Validate existing zip
-        if (zipFile.exists()) {
-          if (FileUtils.validateZipFile(zipFile)) {
+        if (Files.exists(zipFile)) {
+          try {
+            FileUtils.verifyZip(zipFile);
             logger.info("Valid zip already exists, skipping zip step.");
             Bukkit.getScheduler().runTask(plugin, () -> advance(Step.WRITE_COMPLETED));
             return;
-          } else {
+          } catch (IOException e) {
             logger.warning("Existing zip invalid, deleting and re-zipping.");
-            zipFile.delete();
+            Files.deleteIfExists(zipFile);
           }
         }
 
-        FileUtils.zipDirectory(worldFolder, zipFile, Set.of("session.lock", "uid.dat"));
+        World world = Bukkit.getWorld(state.getCurrentWorldName());
+        String dimensionName = dimensionDir.getFileName().toString();
 
-        if (!FileUtils.validateZipFile(zipFile)) {
-          throw new IOException("Zip validation failed after creation.");
+        try (ZipOutputStream zos = new ZipOutputStream(new BufferedOutputStream(Files.newOutputStream(zipFile)))) {
+          Files.walkFileTree(dimensionDir, new SimpleFileVisitor<>() {
+            @Override
+            public @NonNull FileVisitResult preVisitDirectory(@NonNull Path dir, @NonNull BasicFileAttributes attrs) throws IOException {
+              if (!dir.equals(dimensionDir)) {
+                String entryName = dimensionName + '/' + dimensionDir.relativize(dir).toString().replace('\\', '/') + '/';
+                zos.putNextEntry(new ZipEntry(entryName));
+                zos.closeEntry();
+              }
+              return FileVisitResult.CONTINUE;
+            }
+
+            @Override
+            public @NonNull FileVisitResult visitFile(@NonNull Path file, @NonNull BasicFileAttributes attrs) throws IOException {
+              String entryName = dimensionName + '/' + dimensionDir.relativize(file).toString().replace('\\', '/');
+              zos.putNextEntry(new ZipEntry(entryName));
+              try (BufferedInputStream in = new BufferedInputStream(Files.newInputStream(file))) {
+                in.transferTo(zos);
+              }
+              zos.closeEntry();
+              return FileVisitResult.CONTINUE;
+            }
+
+            @Override
+            public @NonNull FileVisitResult visitFileFailed(@NonNull Path file, @NonNull IOException exc) throws IOException {
+              throw exc;
+            }
+          });
+
+          if (world != null) {
+            String manhuntYml = buildManhuntYmlContent(world, seedEntry);
+            zos.putNextEntry(new ZipEntry(GenerationConstants.MANHUNT_YML_FILE_NAME));
+            zos.write(manhuntYml.getBytes(StandardCharsets.UTF_8));
+            zos.closeEntry();
+          }
         }
 
+        FileUtils.verifyZip(zipFile);
         logger.info("Successfully zipped and validated: " + zipFileName);
         Bukkit.getScheduler().runTask(plugin, () -> advance(Step.WRITE_COMPLETED));
       } catch (Exception e) {
         // Delete partial zip on error
         try {
           SeedEntry seedEntry = seeds.get(state.getCurrentIndex());
-          File zipFile = new File(config.getExportPath(), seedEntry.seed() + "_" + config.getServerId() + ".zip");
-          if (zipFile.exists()) zipFile.delete();
+          Path zipFile = Paths.get(config.getExportPath(), seedEntry.seed() + "_" + config.getServerId() + ".zip");
+          Files.deleteIfExists(zipFile);
         } catch (Exception ignored) {}
 
         Bukkit.getScheduler().runTask(plugin, () -> handleError(e));
@@ -355,17 +398,16 @@ public class GenerationTask {
   private void handleCleanup() {
     logger.info("Step: CLEANUP for " + state.getCurrentWorldName());
     Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
-      File worldFolder = state.getCurrentWorldFolder();
-      if (worldFolder != null && worldFolder.exists()) {
-        FileUtils.deleteDirectoryWithRetry(worldFolder, logger, success ->
-          Bukkit.getScheduler().runTask(plugin, () -> {
-            if (success) advance(Step.COMPLETE);
-            else handleError(new RuntimeException("Failed to delete world folder"));
-          })
-        );
-      } else {
-        Bukkit.getScheduler().runTask(plugin, () -> advance(Step.COMPLETE));
-      }
+      Path dimensionFolder = FileUtils.resolveDimensionFolder(
+          state.getCurrentWorldFolder().toPath(),
+          state.getCurrentWorldName()
+      );
+      FileUtils.deleteDirectoryWithRetry(dimensionFolder, logger, success -> {
+        Bukkit.getScheduler().runTask(plugin, () -> {
+          if (success) advance(Step.COMPLETE);
+          else handleError(new RuntimeException("Failed to delete dimension folder: " + dimensionFolder));
+        });
+      });
     });
   }
 
@@ -426,8 +468,7 @@ public class GenerationTask {
     }
   }
 
-  private void createManhuntYml(World world, SeedEntry seed) {
-    File manhuntFile = new File(world.getWorldFolder(), GenerationConstants.MANHUNT_YML_FILE_NAME);
+  private String buildManhuntYmlContent(World world, SeedEntry seed) {
     String direction = calculateDirection(seed, world.getSpawnLocation());
     StringBuilder yaml = new StringBuilder();
     yaml.append("seed: ").append(seed.seed()).append("\n");
@@ -440,13 +481,7 @@ public class GenerationTask {
     yaml.append("  z: ").append(seed.hintZ()).append("\n");
     yaml.append("direction-hint: ").append(direction).append("\n");
     yaml.append("pregen-radius: ").append(config.getGenerationRadius()).append("\n");
-
-    try {
-      Files.writeString(manhuntFile.toPath(), yaml.toString());
-      logger.info("Created manhunt.yml for world " + world.getName());
-    } catch (IOException e) {
-      logger.log(Level.SEVERE, "Failed to create manhunt.yml", e);
-    }
+    return yaml.toString();
   }
 
   private String calculateDirection(SeedEntry seed, Location spawn) {
