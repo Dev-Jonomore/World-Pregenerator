@@ -60,7 +60,10 @@ public class SpawnAdjuster {
           && !groundMat.isAir()
           && groundMat != Material.WATER
           && groundMat != Material.LAVA
+          && groundMat != Material.BAMBOO
           && !Tag.LEAVES.isTagged(groundMat)
+          && !Tag.LEAVES.isTagged(feet.getType())
+          && !Tag.LEAVES.isTagged(head.getType())
           && !ground.getCollisionShape().getBoundingBoxes().isEmpty();
     } else return false;
   }
