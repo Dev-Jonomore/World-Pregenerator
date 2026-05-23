@@ -1,15 +1,14 @@
 package mc.jonomore.worldPregenerator.logic;
 
-import mc.jonomore.worldPregenerator.GenerationConstants;
 import org.bukkit.Material;
 
 public class CageBuilder {
 
-  private final Material cageMaterial;
+  private final org.bukkit.Material cageMaterial;
   private final int cageRadius;
   private final int cageHeight;
 
-  public CageBuilder(Material cageMaterial, int cageRadius, int cageHeight) {
+  public CageBuilder(org.bukkit.Material cageMaterial, int cageRadius, int cageHeight) {
     this.cageMaterial = cageMaterial;
     this.cageRadius = cageRadius;
     this.cageHeight = cageHeight;
@@ -35,16 +34,14 @@ public class CageBuilder {
 
     // Loop through the bounds efficiently
     for (int x = minX; x <= maxX; ++x) {
-      for (int y = floorY; y <= ceilingY; y += GenerationConstants.CAGE_Y_SKIP) {
+      boolean isWallX = x == minX || x == maxX;
+      for (int z = minZ; z <= maxZ; ++z) {
+        boolean isWall = isWallX || (z == minZ || z == maxZ);
+        for (int y = floorY; y <= ceilingY; y += mc.jonomore.worldPregenerator.GenerationConstants.CAGE_Y_SKIP) {
         boolean isFloorOrCeiling = y == floorY || y == ceilingY;
-        for (int z = minZ; z <= maxZ; ++z) {
-
-          boolean isWall = (x == minX || x == maxX || z == minZ || z == maxZ);
-
           if (isFloorOrCeiling || isWall) {
             org.bukkit.block.Block block = world.getBlockAt(x, y, z);
-            boolean passable = block.getCollisionShape().getBoundingBoxes().isEmpty();
-            if (block.getType() != cageMaterial && passable) {
+            if ((block.isPassable() && block.getType() != cageMaterial) || block.getType() == Material.BAMBOO) {
               block.setType(cageMaterial, false);
             }
           }
