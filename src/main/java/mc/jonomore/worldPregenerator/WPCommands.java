@@ -1,8 +1,8 @@
 package mc.jonomore.worldPregenerator;
 
+import com.mojang.brigadier.arguments.LongArgumentType;
 import mc.jonomore.worldPregenerator.config.ConfigValidator;
 import mc.jonomore.worldPregenerator.generation.GenerationState;
-import mc.jonomore.worldPregenerator.util.FileUtils;
 import com.mojang.brigadier.Command;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.context.CommandContext;
@@ -14,8 +14,6 @@ import net.kyori.adventure.text.minimessage.MiniMessage;
 import org.bukkit.Bukkit;
 import org.bukkit.scheduler.BukkitTask;
 
-import java.io.File;
-import java.io.IOException;
 import java.util.stream.Collectors;
 
 public class WPCommands {
@@ -34,7 +32,7 @@ public class WPCommands {
             })
         )
         .then(Commands.literal("start")
-            .executes(ctx -> {
+            .executes(_ -> {
               wp.start();
               return Command.SINGLE_SUCCESS;
             })
@@ -48,14 +46,26 @@ public class WPCommands {
                 return Command.SINGLE_SUCCESS;
             })
         )
+        .then(Commands.literal("test-one")
+            .executes(_ -> {
+              wp.testOne(null);
+              return Command.SINGLE_SUCCESS;
+            })
+            .then(Commands.argument("seed", LongArgumentType.longArg())
+                .executes(ctx -> {
+                  wp.testOne(LongArgumentType.getLong(ctx, "seed"));
+                  return Command.SINGLE_SUCCESS;
+                })
+            )
+        )
         .then(Commands.literal("stop")
-            .executes(ctx -> {
+            .executes(_ -> {
               wp.stop();
               return Command.SINGLE_SUCCESS;
             })
         )
         .then(Commands.literal("retry")
-            .executes(ctx -> {
+            .executes(_ -> {
                 wp.retry();
                 return Command.SINGLE_SUCCESS;
             })
@@ -125,16 +135,16 @@ public class WPCommands {
             })
         )
         .then(Commands.literal("confirm")
-            .executes(ctx -> hardReset(ctx, wp))
+            .executes(ctx -> handleReset(ctx, wp))
         )
         .then(Commands.literal("reload")
-            .executes(ctx -> {
+            .executes(_ -> {
               wp.config.loadConfig();
               return Command.SINGLE_SUCCESS;
             })
         )
         .then(Commands.literal("info")
-            .executes(ctx -> {
+            .executes(_ -> {
               for (String line : wp.config.toString().split("\n")) {
                 wp.getLogger().info(line);
               }
@@ -181,7 +191,7 @@ public class WPCommands {
       return String.format("%02d:%02d:%02d", hours, minutes % 60, seconds % 60);
   }
 
-  private static int hardReset(CommandContext<CommandSourceStack> ctx, WorldPregenerator wp) {
+  private static int handleReset(CommandContext<CommandSourceStack> ctx, WorldPregenerator wp) {
     if (reset_timer == null || reset_timer.isCancelled()) {
       ctx.getSource().getSender().sendMessage(
           MiniMessage.miniMessage().deserialize(
@@ -193,55 +203,6 @@ public class WPCommands {
     reset_timer.cancel();
 
     wp.stop();
-
-    File world_dir = new File(wp.config.getExportPath());
-
-    File[] exported_worlds = world_dir.listFiles();
-
-    if (exported_worlds == null) {
-      ctx.getSource().getSender().sendMessage(
-          MiniMessage.miniMessage().deserialize(
-              "<yellow>[WARNING] Failed to extract exported_worlds from world directory."
-          )
-      );
-    } else if (exported_worlds.length > 0) {
-      ctx.getSource().getSender().sendMessage("Deleting " + exported_worlds.length + " exported worlds...");
-      Bukkit.getScheduler().runTaskAsynchronously(wp, () -> {
-        for (File world_folder : exported_worlds) {
-          try {
-            FileUtils.deleteDirectory(world_folder);
-          } catch (IOException e) {
-            Bukkit.getScheduler().runTask(wp, () ->
-                ctx.getSource().getSender().sendMessage(
-                    MiniMessage.miniMessage().deserialize(
-                        "<red>[ERROR] Failed to delete world file. " + e.getMessage()
-                    )
-                )
-            );
-          }
-        }
-
-        Bukkit.getScheduler().runTask(wp, () -> {
-          File[] remaining_worlds = world_dir.listFiles();
-          if (remaining_worlds != null && remaining_worlds.length != 0) {
-            ctx.getSource().getSender().sendMessage(
-                MiniMessage.miniMessage().deserialize(
-                    "<yellow>[WARNING] there are still <dark_red>" +
-                        remaining_worlds.length + "</dark_red> worlds in your world directory."
-                )
-            );
-          } else {
-            ctx.getSource().getSender().sendMessage(
-                MiniMessage.miniMessage().deserialize(
-                    "<green>All exported worlds successfully deleted!"
-                )
-            );
-          }
-        });
-      });
-    } else {
-      ctx.getSource().getSender().sendMessage("No exported worlds to delete!");
-    }
 
     // Reset the generation task, which also deletes any partially generated world
     wp.reset();

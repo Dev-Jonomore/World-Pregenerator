@@ -20,6 +20,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.logging.Level;
 import java.util.zip.ZipEntry;
+import java.util.zip.ZipFile;
 import java.util.zip.ZipOutputStream;
 
 public class GenerationTask {
@@ -50,6 +51,7 @@ public class GenerationTask {
   private int retryCount = 0;
   private int worldsInCurrentBatch = 0;
   private boolean interrupted = false;
+  private boolean testMode = false;
   private BukkitTask scheduledTask = null;
 
   public GenerationTask(
@@ -57,7 +59,8 @@ public class GenerationTask {
       List<SeedEntry> seeds,
       Set<Long> completedSeeds,
       ChunkyAPI chunky,
-      GenerationState state
+      GenerationState state,
+      boolean testMode
   ) {
     this.plugin = plugin;
     config = plugin.config;
@@ -72,6 +75,7 @@ public class GenerationTask {
     spawnAdjuster = new SpawnAdjuster(config.getMaxSearchRadius(), config.getMaxVerticalScan());
     cageBuilder = new CageBuilder(config.getCageMaterial(), config.getCageRadius(), config.getCageHeight());
     this.state.setTotalSeeds(seeds.size());
+    this.testMode = testMode;
 
     // Ensure starting step is set if it's IDLE or invalid
     if (state.getCurrentStep() == null || "IDLE".equals(state.getCurrentStep())) {
@@ -107,9 +111,12 @@ public class GenerationTask {
       String worldName = state.getCurrentWorldName();
       World world = Bukkit.getWorld(worldName);
       if (world != null) Bukkit.unloadWorld(world, false);
-      File worldFolder = state.getCurrentWorldFolder();
-      if (worldFolder != null && worldFolder.exists()) {
-        FileUtils.deleteDirectoryWithRetry(worldFolder.toPath(), logger, null);
+      Path dimensionDir = FileUtils.resolveDimensionFolder(
+          state.getCurrentWorldFolder().toPath(),
+          worldName
+      );
+      if (Files.exists(dimensionDir)) {
+        FileUtils.deleteDirectoryWithRetry(dimensionDir, logger, null);
       }
     }
     state.setCurrentIndex(0);
@@ -421,6 +428,33 @@ public class GenerationTask {
     worldsInCurrentBatch++;
     retryCount = 0;
     saveState();
+
+    if (testMode) {
+      long totalTime = System.currentTimeMillis() - state.getStartTime();
+      SeedEntry seed = seeds.get(0);
+      World world = Bukkit.getWorld(state.getCurrentWorldName());
+      Path zipFile = Paths.get(config.getExportPath(), seed.seed() + "_" + config.getServerId() + ".zip");
+
+      logger.info("=== test-one results ===");
+      logger.info("Seed: " + seed.seed());
+      logger.info("Spawn: " + (world != null ?
+          world.getSpawnLocation().getBlockX() + ", " +
+              world.getSpawnLocation().getBlockY() + ", " +
+              world.getSpawnLocation().getBlockZ() : "unknown"));
+      logger.info("Total time: " + totalTime + "ms");
+
+      try {
+        long zipSize = Files.size(zipFile);
+        logger.info("Zip size: " + String.format("%.2f", zipSize / 1_048_576.0) + " MB");
+        try (ZipFile zf = new ZipFile(zipFile.toFile())) {
+          logger.info("Zip entries: " + zf.size());
+        }
+      } catch (IOException e) {
+        logger.warning("Could not read zip metrics: " + e.getMessage());
+      }
+
+      logger.info("=======================");
+    }
 
     if (state.getCurrentIndex() >= seeds.size()) {
       logger.info("All worlds generated successfully!");

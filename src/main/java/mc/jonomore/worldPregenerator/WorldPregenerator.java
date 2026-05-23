@@ -62,7 +62,7 @@ public final class WorldPregenerator extends JavaPlugin {
       }
 
       state.setCurrentIndex(0);
-      task = new GenerationTask(this, seedsToProcess, completedSeeds, chunky, state);
+      task = new GenerationTask(this, seedsToProcess, completedSeeds, chunky, state, false);
     }
 
     running = true;
@@ -101,7 +101,7 @@ public final class WorldPregenerator extends JavaPlugin {
     state.setStartTime(System.currentTimeMillis());
     state.setCurrentStep("RETRYING_FAILED");
 
-    task = new GenerationTask(this, failedSeeds, completedSeeds, chunky, state);
+    task = new GenerationTask(this, failedSeeds, completedSeeds, chunky, state, false);
     running = true;
     task.start();
   }
@@ -148,9 +148,10 @@ public final class WorldPregenerator extends JavaPlugin {
           running = false;
           
           File stateFile = new File(getDataFolder(), GenerationConstants.STATE_FILE_NAME);
-          if (stateFile.exists()) {
-              stateFile.delete();
-          }
+          if (stateFile.exists()) stateFile.delete();
+
+          File completedFile = new File(getDataFolder(), GenerationConstants.COMPLETED_SEEDS_FILE_NAME);
+          if (completedFile.exists()) completedFile.delete();
       } else {
           getLogger().warning("No task to reset!");
       }
@@ -253,5 +254,36 @@ public final class WorldPregenerator extends JavaPlugin {
               stateFile.renameTo(new File(getDataFolder(), GenerationConstants.STATE_FILE_NAME + ".corrupt"));
           }
       }
+  }
+
+  public void testOne(Long seedOverride) {
+    if (running) {
+      getLogger().warning("Generation already running!");
+      return;
+    }
+
+    List<SeedEntry> allSeeds = readSeeds();
+    SeedEntry testSeed;
+
+    if (seedOverride != null) {
+      testSeed = new SeedEntry(seedOverride, 0, 0);
+    } else if (!allSeeds.isEmpty()) {
+      testSeed = allSeeds.get(0);
+    } else {
+      testSeed = new SeedEntry(42L, 0, 0);
+    }
+
+    getLogger().info("Starting test-one for seed: " + testSeed.seed());
+
+    ChunkyAPI chunky = getServer().getServicesManager().load(ChunkyAPI.class);
+    if (chunky == null) {
+      getLogger().severe("Chunky API not found!");
+      return;
+    }
+
+    state = new GenerationState();
+    task = new GenerationTask(this, List.of(testSeed), new java.util.HashSet<>(), chunky, state, true);
+    running = true;
+    task.start();
   }
 }
