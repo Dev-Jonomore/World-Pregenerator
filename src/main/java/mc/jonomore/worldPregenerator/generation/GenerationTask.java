@@ -183,6 +183,10 @@ public class GenerationTask {
         if (world == null) throw new RuntimeException("Failed to create world " + worldName);
 
         world.setDifficulty(Difficulty.EASY);
+        world.setGameRule(GameRules.ADVANCE_TIME, false);
+        world.setGameRule(GameRules.ADVANCE_WEATHER, false);
+        world.setGameRule(GameRules.SPAWN_MOBS, false);
+        world.setGameRule(GameRules.SPAWN_MONSTERS, false);
         state.setCurrentWorldName(world.getName());
         state.setCurrentWorldFolder(world.getWorldFolder());
 
@@ -354,10 +358,9 @@ public class GenerationTask {
           zos.putNextEntry(new ZipEntry(GenerationConstants.MANHUNT_YML_FILE_NAME));
           zos.write(manhuntYml.getBytes(StandardCharsets.UTF_8));
           zos.closeEntry();
-
-          FileUtils.verifyZip(zipFile);
-          logger.info("Successfully zipped and verified: " + zipFileName);
         }
+        FileUtils.verifyZip(zipFile);
+        logger.info("Successfully zipped and verified: " + zipFileName);
 
         Bukkit.getScheduler().runTask(plugin, () -> advance(Step.WRITE_COMPLETED));
 
@@ -508,7 +511,9 @@ public class GenerationTask {
         "  x: " + seed.hintX() + "\n" +
         "  z: " + seed.hintZ() + "\n" +
         "direction-hint: " + direction + "\n" +
-        "pregen-radius: " + config.getGenerationRadius() + "\n";
+        "pregen-radius: " + config.getGenerationRadius() + "\n" +
+        "worlds:\n" +
+        "  overworld: " + world.getName() + '\n';
   }
 
   private String calculateDirection(SeedEntry seed, Location spawn) {
