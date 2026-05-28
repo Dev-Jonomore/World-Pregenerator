@@ -51,7 +51,7 @@ public class GenerationTask {
   private int retryCount = 0;
   private int worldsInCurrentBatch = 0;
   private boolean interrupted = false;
-  private boolean testMode = false;
+  private final boolean testMode;
   private BukkitTask scheduledTask = null;
 
   public GenerationTask(
@@ -111,12 +111,9 @@ public class GenerationTask {
       String worldName = state.getCurrentWorldName();
       World world = Bukkit.getWorld(worldName);
       if (world != null) Bukkit.unloadWorld(world, false);
-      Path dimensionDir = FileUtils.resolveDimensionFolder(
-          state.getCurrentWorldFolder().toPath(),
-          worldName
-      );
-      if (Files.exists(dimensionDir)) {
-        FileUtils.deleteDirectoryWithRetry(dimensionDir, logger, null);
+      Path worldFolder = state.getCurrentWorldFolder().toPath();
+      if (Files.exists(worldFolder)) {
+        FileUtils.deleteDirectoryWithRetry(worldFolder, logger, null);
       }
     }
     state.setCurrentIndex(0);
@@ -270,6 +267,9 @@ public class GenerationTask {
           }
         }
 
+        SeedEntry seedEntry = seeds.get(state.getCurrentIndex());
+        state.setPendingManhuntYml(buildManhuntYmlContent(world, seedEntry));
+
         // Cage
         cageBuilder.buildCage(world);
 
@@ -287,20 +287,19 @@ public class GenerationTask {
 
   private void handleZipExport() {
     logger.info("Step: ZIP_EXPORT for " + state.getCurrentWorldName());
+
     Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
       try {
         SeedEntry seedEntry = seeds.get(state.getCurrentIndex());
+        String worldName = state.getCurrentWorldName();
         File worldFolder = state.getCurrentWorldFolder();
-        if (worldFolder == null || !worldFolder.exists()) {
-          throw new IOException("World folder not found for zipping: " + state.getCurrentWorldName());
+
+        if (worldName == null || worldFolder == null) {
+          throw new IOException("World state missing for ZIP_EXPORT");
         }
 
-        Path dimensionDir = FileUtils.resolveDimensionFolder(
-            worldFolder.toPath(),
-            state.getCurrentWorldName()
-        );
-        if (!Files.isDirectory(dimensionDir)) {
-          throw new IOException("Dimension folder not found: " + dimensionDir);
+        if (!Files.isDirectory(worldFolder.toPath())) {
+          throw new IOException("Dimension folder not found: " + worldFolder);
         }
 
         Path exportPath = Paths.get(config.getExportPath());
@@ -309,28 +308,25 @@ public class GenerationTask {
         String zipFileName = seedEntry.seed() + "_" + config.getServerId() + ".zip";
         Path zipFile = exportPath.resolve(zipFileName);
 
-        // Idempotency: Validate existing zip
+        // Idempotency: validate existing zip before re-zipping
         if (Files.exists(zipFile)) {
           try {
             FileUtils.verifyZip(zipFile);
-            logger.info("Valid zip already exists, skipping zip step.");
+            logger.info("Valid zip already exists for seed " + seedEntry.seed() + ", skipping.");
             Bukkit.getScheduler().runTask(plugin, () -> advance(Step.WRITE_COMPLETED));
             return;
           } catch (IOException e) {
-            logger.warning("Existing zip invalid, deleting and re-zipping.");
+            logger.warning("Existing zip invalid, re-zipping: " + zipFile.getFileName());
             Files.deleteIfExists(zipFile);
           }
         }
 
-        World world = Bukkit.getWorld(state.getCurrentWorldName());
-        String dimensionName = dimensionDir.getFileName().toString();
-
         try (ZipOutputStream zos = new ZipOutputStream(new BufferedOutputStream(Files.newOutputStream(zipFile)))) {
-          Files.walkFileTree(dimensionDir, new SimpleFileVisitor<>() {
+          Files.walkFileTree(worldFolder.toPath(), new SimpleFileVisitor<>() {
             @Override
             public @NonNull FileVisitResult preVisitDirectory(@NonNull Path dir, @NonNull BasicFileAttributes attrs) throws IOException {
-              if (!dir.equals(dimensionDir)) {
-                String entryName = dimensionName + '/' + dimensionDir.relativize(dir).toString().replace('\\', '/') + '/';
+              if (!dir.equals(worldFolder.toPath())) {
+                String entryName = worldName + '/' + worldFolder.toPath().relativize(dir).toString().replace('\\', '/') + '/';
                 zos.putNextEntry(new ZipEntry(entryName));
                 zos.closeEntry();
               }
@@ -339,7 +335,7 @@ public class GenerationTask {
 
             @Override
             public @NonNull FileVisitResult visitFile(@NonNull Path file, @NonNull BasicFileAttributes attrs) throws IOException {
-              String entryName = dimensionName + '/' + dimensionDir.relativize(file).toString().replace('\\', '/');
+              String entryName = worldName + '/' + worldFolder.toPath().relativize(file).toString().replace('\\', '/');
               zos.putNextEntry(new ZipEntry(entryName));
               try (BufferedInputStream in = new BufferedInputStream(Files.newInputStream(file))) {
                 in.transferTo(zos);
@@ -354,22 +350,23 @@ public class GenerationTask {
             }
           });
 
-          if (world != null) {
-            String manhuntYml = buildManhuntYmlContent(world, seedEntry);
-            zos.putNextEntry(new ZipEntry(GenerationConstants.MANHUNT_YML_FILE_NAME));
-            zos.write(manhuntYml.getBytes(StandardCharsets.UTF_8));
-            zos.closeEntry();
-          }
+          String manhuntYml = state.getPendingManhuntYml();
+          zos.putNextEntry(new ZipEntry(GenerationConstants.MANHUNT_YML_FILE_NAME));
+          zos.write(manhuntYml.getBytes(StandardCharsets.UTF_8));
+          zos.closeEntry();
+
+          FileUtils.verifyZip(zipFile);
+          logger.info("Successfully zipped and verified: " + zipFileName);
         }
 
-        FileUtils.verifyZip(zipFile);
-        logger.info("Successfully zipped and validated: " + zipFileName);
         Bukkit.getScheduler().runTask(plugin, () -> advance(Step.WRITE_COMPLETED));
+
       } catch (Exception e) {
-        // Delete partial zip on error
+        // Delete partial zip on failure
         try {
           SeedEntry seedEntry = seeds.get(state.getCurrentIndex());
-          Path zipFile = Paths.get(config.getExportPath(), seedEntry.seed() + "_" + config.getServerId() + ".zip");
+          Path zipFile = Paths.get(config.getExportPath(),
+              seedEntry.seed() + "_" + config.getServerId() + ".zip");
           Files.deleteIfExists(zipFile);
         } catch (Exception ignored) {}
 
@@ -405,33 +402,20 @@ public class GenerationTask {
   private void handleCleanup() {
     logger.info("Step: CLEANUP for " + state.getCurrentWorldName());
     Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
-      Path dimensionFolder = FileUtils.resolveDimensionFolder(
-          state.getCurrentWorldFolder().toPath(),
-          state.getCurrentWorldName()
-      );
-      FileUtils.deleteDirectoryWithRetry(dimensionFolder, logger, success -> {
-        Bukkit.getScheduler().runTask(plugin, () -> {
-          if (success) advance(Step.COMPLETE);
-          else handleError(new RuntimeException("Failed to delete dimension folder: " + dimensionFolder));
-        });
-      });
+      Path dimensionFolder = state.getCurrentWorldFolder().toPath();
+      FileUtils.deleteDirectoryWithRetry(dimensionFolder, logger, success -> Bukkit.getScheduler().runTask(plugin, () -> {
+        if (success) advance(Step.COMPLETE);
+        else handleError(new RuntimeException("Failed to delete dimension folder: " + dimensionFolder));
+      }));
     });
   }
 
   private void handleComplete() {
     logger.info("Step: COMPLETE for seed index " + state.getCurrentIndex());
-    state.setSuccessCount(state.getSuccessCount() + 1);
-    state.setCurrentIndex(state.getCurrentIndex() + 1);
-    state.setCurrentWorldName(null);
-    state.setCurrentWorldFolder(null);
-    state.setCurrentStep(Step.CREATE_WORLD.name());
-    worldsInCurrentBatch++;
-    retryCount = 0;
-    saveState();
 
     if (testMode) {
       long totalTime = System.currentTimeMillis() - state.getStartTime();
-      SeedEntry seed = seeds.get(0);
+      SeedEntry seed = seeds.getFirst();
       World world = Bukkit.getWorld(state.getCurrentWorldName());
       Path zipFile = Paths.get(config.getExportPath(), seed.seed() + "_" + config.getServerId() + ".zip");
 
@@ -455,6 +439,17 @@ public class GenerationTask {
 
       logger.info("=======================");
     }
+
+    state.setSuccessCount(state.getSuccessCount() + 1);
+    state.setCurrentIndex(state.getCurrentIndex() + 1);
+    state.setCurrentWorldName(null);
+    state.setCurrentWorldFolder(null);
+    state.setPendingManhuntYml(null);
+    state.setCurrentStep(Step.CREATE_WORLD.name());
+    worldsInCurrentBatch++;
+    retryCount = 0;
+    saveState();
+
 
     if (state.getCurrentIndex() >= seeds.size()) {
       logger.info("All worlds generated successfully!");
@@ -504,18 +499,16 @@ public class GenerationTask {
 
   private String buildManhuntYmlContent(World world, SeedEntry seed) {
     String direction = calculateDirection(seed, world.getSpawnLocation());
-    StringBuilder yaml = new StringBuilder();
-    yaml.append("seed: ").append(seed.seed()).append("\n");
-    yaml.append("spawn:\n");
-    yaml.append("  x: ").append(world.getSpawnLocation().getBlockX()).append("\n");
-    yaml.append("  y: ").append(world.getSpawnLocation().getBlockY()).append("\n");
-    yaml.append("  z: ").append(world.getSpawnLocation().getBlockZ()).append("\n");
-    yaml.append("coordinate-hint:\n");
-    yaml.append("  x: ").append(seed.hintX()).append("\n");
-    yaml.append("  z: ").append(seed.hintZ()).append("\n");
-    yaml.append("direction-hint: ").append(direction).append("\n");
-    yaml.append("pregen-radius: ").append(config.getGenerationRadius()).append("\n");
-    return yaml.toString();
+    return "seed: " + seed.seed() + "\n" +
+        "spawn:\n" +
+        "  x: " + world.getSpawnLocation().getBlockX() + "\n" +
+        "  y: " + world.getSpawnLocation().getBlockY() + "\n" +
+        "  z: " + world.getSpawnLocation().getBlockZ() + "\n" +
+        "coordinate-hint:\n" +
+        "  x: " + seed.hintX() + "\n" +
+        "  z: " + seed.hintZ() + "\n" +
+        "direction-hint: " + direction + "\n" +
+        "pregen-radius: " + config.getGenerationRadius() + "\n";
   }
 
   private String calculateDirection(SeedEntry seed, Location spawn) {

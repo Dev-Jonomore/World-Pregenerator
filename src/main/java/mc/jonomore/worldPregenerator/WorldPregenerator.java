@@ -81,8 +81,8 @@ public final class WorldPregenerator extends JavaPlugin {
     }
 
     List<SeedEntry> failedSeeds = state.getFailedSeeds().stream()
-            .map(FailedSeedEntry::seedEntry)
-            .toList();
+      .map(FailedSeedEntry::seedEntry)
+      .toList();
     getLogger().info("Retrying generation for " + failedSeeds.size() + " failed seeds.");
 
     ChunkyAPI chunky = getServer().getServicesManager().load(ChunkyAPI.class);
@@ -107,26 +107,26 @@ public final class WorldPregenerator extends JavaPlugin {
   }
 
   private java.util.Set<Long> loadCompletedSeeds() {
-      File completedFile = new File(getDataFolder(), GenerationConstants.COMPLETED_SEEDS_FILE_NAME);
-      if (!completedFile.exists()) return new java.util.HashSet<>();
-      
-      try (java.util.stream.Stream<String> lines = Files.lines(completedFile.toPath())) {
-          return lines.map(String::trim)
-              .filter(line -> !line.isEmpty())
-              .map(line -> {
-                  try {
-                      return Long.parseLong(line);
-                  } catch (NumberFormatException e) {
-                      getLogger().warning("Failed to parse seed in completed.txt: " + line);
-                      return null;
-                  }
-              })
-              .filter(java.util.Objects::nonNull)
-              .collect(java.util.stream.Collectors.toSet());
-      } catch (IOException e) {
-          getLogger().log(Level.SEVERE, "Failed to load completed seeds", e);
-          return new java.util.HashSet<>();
-      }
+    File completedFile = new File(getDataFolder(), GenerationConstants.COMPLETED_SEEDS_FILE_NAME);
+    if (!completedFile.exists()) return new java.util.HashSet<>();
+
+    try (java.util.stream.Stream<String> lines = Files.lines(completedFile.toPath())) {
+      return lines.map(String::trim)
+        .filter(line -> !line.isEmpty())
+        .map(line -> {
+          try {
+            return Long.parseLong(line);
+          } catch (NumberFormatException e) {
+            getLogger().warning("Failed to parse seed in completed.txt: " + line);
+            return null;
+          }
+        })
+        .filter(java.util.Objects::nonNull)
+        .collect(java.util.stream.Collectors.toSet());
+    } catch (IOException e) {
+      getLogger().log(Level.SEVERE, "Failed to load completed seeds", e);
+      return new java.util.HashSet<>();
+    }
   }
 
   public void stop() {
@@ -141,47 +141,47 @@ public final class WorldPregenerator extends JavaPlugin {
   }
 
   public void reset() {
-      if (task != null) {
-          task.reset();
-          task = null;
-          state = null;
-          running = false;
-          
-          File stateFile = new File(getDataFolder(), GenerationConstants.STATE_FILE_NAME);
-          if (stateFile.exists()) stateFile.delete();
+    if (task != null) {
+      task.reset();
+      task = null;
+      state = null;
+      running = false;
 
-          File completedFile = new File(getDataFolder(), GenerationConstants.COMPLETED_SEEDS_FILE_NAME);
-          if (completedFile.exists()) completedFile.delete();
-      } else {
-          getLogger().warning("No task to reset!");
-      }
+      File stateFile = new File(getDataFolder(), GenerationConstants.STATE_FILE_NAME);
+      if (stateFile.exists()) stateFile.delete();
+
+      File completedFile = new File(getDataFolder(), GenerationConstants.COMPLETED_SEEDS_FILE_NAME);
+      if (completedFile.exists()) completedFile.delete();
+    } else {
+      getLogger().warning("No task to reset!");
+    }
   }
 
   private List<SeedEntry> readSeeds() {
     // Expected format: "- XXX [X, ~ Z]" where XXX is seed, X is hintX, Z is hintZ
     // Example: "- 12345 [100, ~ 200]"
-    java.util.regex.Pattern pattern = java.util.regex.Pattern.compile("^-\\s*(-?\\d+)\\s*\\[\\s*(-?\\d+)\\s*,\\s*~\\s*(-?\\d+)\\s*]$");
+    java.util.regex.Pattern pattern = java.util.regex.Pattern.compile("^-\\s*(-?\\d+)\\s*\\[\\s*(-?\\d+)\\s*,\\s*(?:~\\s*)?(-?\\d+)\\s*]$");
     try (java.util.stream.Stream<String> lines = Files.lines(Paths.get(config.getSeedsFile()))) {
-        return lines.map(String::trim)
-            .filter(line -> !line.isEmpty())
-            .map(line -> {
-                java.util.regex.Matcher matcher = pattern.matcher(line);
-                if (matcher.find()) {
-                    try {
-                        long seed = Long.parseLong(matcher.group(1));
-                        int hintX = Integer.parseInt(matcher.group(2));
-                        int hintZ = Integer.parseInt(matcher.group(3));
-                        return new SeedEntry(seed, hintX, hintZ);
-                    } catch (NumberFormatException e) {
-                        getLogger().warning("Failed to parse numbers in line: " + line);
-                    }
-                } else {
-                    getLogger().warning("Line does not match seed pattern: " + line);
-                }
-                return null;
-            })
-            .filter(java.util.Objects::nonNull)
-            .toList();
+      return lines.map(String::trim)
+        .filter(line -> !line.isEmpty())
+        .map(line -> {
+          java.util.regex.Matcher matcher = pattern.matcher(line);
+          if (matcher.find()) {
+            try {
+              long seed = Long.parseLong(matcher.group(1));
+              int hintX = Integer.parseInt(matcher.group(2));
+              int hintZ = Integer.parseInt(matcher.group(3));
+              return new SeedEntry(seed, hintX, hintZ);
+            } catch (NumberFormatException e) {
+              getLogger().warning("Failed to parse numbers in line: " + line);
+            }
+          } else {
+            getLogger().warning("Line does not match seed pattern: " + line);
+          }
+          return null;
+        })
+        .filter(java.util.Objects::nonNull)
+        .toList();
     } catch (IOException e) {
       getLogger().severe("Error reading seeds: " + e.getMessage());
       return Collections.emptyList();
@@ -203,31 +203,31 @@ public final class WorldPregenerator extends JavaPlugin {
     );
 
     if (state != null && state.getCurrentIndex() > 0 && !"COMPLETED".equals(state.getCurrentStep())) {
-        getLogger().info("Found previous generation state. You can resume with /wp start");
-        
-        // Cleanup partial world if it exists
-        if (state.getCurrentWorldName() != null) {
-            String worldName = state.getCurrentWorldName();
-            File worldFolder = new File(getServer().getWorldContainer(), worldName);
-            if (worldFolder.exists()) {
-                getLogger().info("Cleaning up partial world from previous run: " + worldName);
-                Bukkit.getScheduler().runTaskLater(this, () -> {
-                    World world = Bukkit.getWorld(worldName);
-                    if (world != null) {
-                        Bukkit.unloadWorld(world, false);
-                    }
-                    Bukkit.getScheduler().runTaskAsynchronously(this, () -> {
-                        try {
-                            FileUtils.deleteDirectory(worldFolder);
-                            getLogger().info("Successfully cleaned up " + worldName);
-                        } catch (IOException e) {
-                            getLogger().log(Level.SEVERE, "Failed to cleanup partial world " + worldName, e);
-                        }
-                    });
-                    state.setCurrentStep("CREATE_WORLD");
-                }, 20L); // Wait a bit for server to fully start
+      getLogger().info("Found previous generation state. You can resume with /wp start");
+
+      // Cleanup partial world if it exists
+      if (state.getCurrentWorldName() != null) {
+        String worldName = state.getCurrentWorldName();
+        File worldFolder = new File(getServer().getWorldContainer(), worldName);
+        if (worldFolder.exists()) {
+          getLogger().info("Cleaning up partial world from previous run: " + worldName);
+          Bukkit.getScheduler().runTaskLater(this, () -> {
+            World world = Bukkit.getWorld(worldName);
+            if (world != null) {
+              Bukkit.unloadWorld(world, false);
             }
+            Bukkit.getScheduler().runTaskAsynchronously(this, () -> {
+              try {
+                FileUtils.deleteDirectory(worldFolder.toPath());
+                getLogger().info("Successfully cleaned up " + worldName);
+              } catch (IOException e) {
+                getLogger().log(Level.SEVERE, "Failed to cleanup partial world " + worldName, e);
+              }
+            });
+            state.setCurrentStep("CREATE_WORLD");
+          }, 20L); // Wait a bit for server to fully start
         }
+      }
     }
 
     getLogger().info("WorldPregenerator enabled!");
@@ -243,17 +243,17 @@ public final class WorldPregenerator extends JavaPlugin {
   }
   
   private void loadState() {
-      File stateFile = new File(getDataFolder(), GenerationConstants.STATE_FILE_NAME);
-      if (stateFile.exists()) {
-          try {
-              state = GenerationState.load(stateFile);
-              getLogger().info("Loaded generation state from " + GenerationConstants.STATE_FILE_NAME);
-          } catch (Exception e) {
-              getLogger().log(Level.SEVERE, "Failed to load generation state. The state file might be corrupt or using an older format.", e);
-              // We could potentially rename the corrupt file here to prevent infinite loop
-              stateFile.renameTo(new File(getDataFolder(), GenerationConstants.STATE_FILE_NAME + ".corrupt"));
-          }
+    File stateFile = new File(getDataFolder(), GenerationConstants.STATE_FILE_NAME);
+    if (stateFile.exists()) {
+      try {
+        state = GenerationState.load(stateFile);
+        getLogger().info("Loaded generation state from " + GenerationConstants.STATE_FILE_NAME);
+      } catch (Exception e) {
+        getLogger().log(Level.SEVERE, "Failed to load generation state. The state file might be corrupt or using an older format.", e);
+        // We could potentially rename the corrupt file here to prevent infinite loop
+        stateFile.renameTo(new File(getDataFolder(), GenerationConstants.STATE_FILE_NAME + ".corrupt"));
       }
+    }
   }
 
   public void testOne(Long seedOverride) {
@@ -268,7 +268,7 @@ public final class WorldPregenerator extends JavaPlugin {
     if (seedOverride != null) {
       testSeed = new SeedEntry(seedOverride, 0, 0);
     } else if (!allSeeds.isEmpty()) {
-      testSeed = allSeeds.get(0);
+      testSeed = allSeeds.getFirst();
     } else {
       testSeed = new SeedEntry(42L, 0, 0);
     }

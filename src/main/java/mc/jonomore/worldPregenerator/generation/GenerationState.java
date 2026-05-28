@@ -20,10 +20,11 @@ public class GenerationState {
     private String currentStep = "IDLE";
     private String currentWorldName = null;
     private File currentWorldFolder = null;
+    private String pendingManhuntYml;
 
     private static final Gson GSON = new GsonBuilder()
-            .registerTypeAdapter(File.class, (JsonSerializer<File>) (src, typeOfSrc, context) -> new JsonPrimitive(src.getPath()))
-            .registerTypeAdapter(File.class, (JsonDeserializer<File>) (json, typeOfT, context) -> new File(json.getAsString()))
+            .registerTypeAdapter(File.class, (JsonSerializer<File>) (src, _, _) -> new JsonPrimitive(src.getPath()))
+            .registerTypeAdapter(File.class, (JsonDeserializer<File>) (json, _, _) -> new File(json.getAsString()))
             .setPrettyPrinting()
             .create();
 
@@ -68,6 +69,9 @@ public class GenerationState {
 
     public File getCurrentWorldFolder() { return currentWorldFolder; }
     public void setCurrentWorldFolder(File currentWorldFolder) { this.currentWorldFolder = currentWorldFolder; }
+
+    public String getPendingManhuntYml() { return pendingManhuntYml; }
+    public void setPendingManhuntYml(String mYaml) { this.pendingManhuntYml = mYaml; }
 
     public double getProgress() {
         if (totalSeeds == 0) return 0;

@@ -1,6 +1,6 @@
 name: World-Pregenerator
-version: '1.5'
+version: "${version}"
 main: mc.jonomore.worldPregenerator.WorldPregenerator
-api-version: '1.21'
+api-version: '26.1'
 depend:
   - Chunky
