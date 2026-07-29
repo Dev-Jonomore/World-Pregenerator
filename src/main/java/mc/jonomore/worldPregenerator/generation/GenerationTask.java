@@ -3,7 +3,6 @@ package mc.jonomore.worldPregenerator.generation;
 import mc.jonomore.worldPregenerator.GenerationConstants;
 import mc.jonomore.worldPregenerator.WorldPregenerator;
 import mc.jonomore.worldPregenerator.config.ConfigManager;
-import mc.jonomore.worldPregenerator.logic.CageBuilder;
 import mc.jonomore.worldPregenerator.logic.SpawnAdjuster;
 import mc.jonomore.worldPregenerator.util.FileUtils;
 import org.bukkit.*;
@@ -42,7 +41,6 @@ public class GenerationTask {
   private final Set<Long> completedSeeds;
   private final ChunkyAPI chunky;
   private final SpawnAdjuster spawnAdjuster;
-  private final CageBuilder cageBuilder;
   private final ErrorHandler errorHandler;
   private final GenerationState state;
   private final File stateFile;
@@ -73,7 +71,6 @@ public class GenerationTask {
     this.chunky = chunky;
     errorHandler = new ErrorHandler(logger);
     spawnAdjuster = new SpawnAdjuster(config.getMaxSearchRadius(), config.getMaxVerticalScan());
-    cageBuilder = new CageBuilder(config.getCageMaterial(), config.getCageRadius(), config.getCageHeight());
     this.state.setTotalSeeds(seeds.size());
     this.testMode = testMode;
 
@@ -169,6 +166,7 @@ public class GenerationTask {
       try {
         SeedEntry seedEntry = seeds.get(state.getCurrentIndex());
         String worldName = "world_" + state.getCurrentIndex();
+        NamespacedKey worldKey = new NamespacedKey("manhunt", worldName);
 
         logger.info("Step: CREATE_WORLD for " + worldName);
 
@@ -188,6 +186,7 @@ public class GenerationTask {
         world.setGameRule(GameRules.SPAWN_MOBS, false);
         world.setGameRule(GameRules.SPAWN_MONSTERS, false);
         state.setCurrentWorldName(world.getName());
+        state.setCurrentWorldKey(world.getKey());
         state.setCurrentWorldFolder(world.getWorldFolder());
 
         advance(Step.GENERATE_CHUNKS);
@@ -198,7 +197,7 @@ public class GenerationTask {
   }
 
   private void handleGenerateChunks() {
-    final String targetWorld = state.getCurrentWorldName();
+    final NamespacedKey targetWorld = state.getCurrentWorldKey();
     if (targetWorld == null) {
       state.setCurrentStep(Step.CREATE_WORLD.name());
       dispatch();
@@ -213,7 +212,7 @@ public class GenerationTask {
       private boolean active = true;
       @Override
       public void accept(GenerationCompleteEvent event) {
-        if (!active || !event.world().equals(targetWorld)) return;
+        if (!active || !event.world().equals(targetWorld.asString())) return;
         active = false; // Ensure this listener only triggers once for its target world
 
         if (interrupted) return;
@@ -231,9 +230,9 @@ public class GenerationTask {
         return;
       }
 
-      if (!chunky.isRunning(targetWorld)) {
+      if (!chunky.isRunning(targetWorld.asString())) {
         chunky.startTask(
-            targetWorld,
+            targetWorld.asString(),
             "square",
             world.getSpawnLocation().getX(),
             world.getSpawnLocation().getZ(),
@@ -273,9 +272,6 @@ public class GenerationTask {
 
         SeedEntry seedEntry = seeds.get(state.getCurrentIndex());
         state.setPendingManhuntYml(buildManhuntYmlContent(world, seedEntry));
-
-        // Cage
-        cageBuilder.buildCage(world);
 
         // Save and Unload
         world.save();

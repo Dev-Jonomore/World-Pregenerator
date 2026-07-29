@@ -21,7 +21,7 @@ repositories {
 
 dependencies {
     compileOnly("io.papermc.paper:paper-api:26.1.2.build.+")
-    compileOnly(group = "org.popcraft", name = "chunky-common", version = "1.3.38")
+    compileOnly("org.popcraft:chunky-common:1.5.3")
 }
 
 java {
