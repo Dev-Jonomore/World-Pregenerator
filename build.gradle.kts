@@ -43,8 +43,11 @@ tasks {
 
     processResources {
         filteringCharset = "UTF-8"
+        // Read at configuration time: filesMatching runs during execution, where touching
+        // `project` is Task.project -- unsupported with the configuration cache.
+        val pluginVersion = project.version
         filesMatching("plugin.yml") {
-            expand("version" to project.version)
+            expand("version" to pluginVersion)
         }
     }
 
