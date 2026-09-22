@@ -15,7 +15,7 @@ A Paper/Bukkit plugin that batch-generates Minecraft worlds from a seed list, co
 ## Quick Start
 
 1.  **Configure `config.yml`**: Open `plugins/WorldPregenerator/config.yml` and set `export-path` to your desired output directory for slime worlds.
-2.  **Create `seeds.txt`**: Create a file named `seeds.txt` (or as configured in `seeds-file`) and add one seed (formatted as "- ### [X, ~ Z]" where `###` is the seed and `[X, ~ Z]` is an x and z coordinate with a y placeholder in between) per line.
+2.  **Create `seeds.txt`**: Create a file named `seeds.txt` (or as configured in `seeds-file`) and add one seed per line, formatted as `seed/x1,y1,z1/x2,y2,z2/x3,y3,z3` where each `x,y,z` group is a spawn point for that world (e.g. `12345/100,64,200/-50,70,30/0,80,-120`). The spawn points are written to the world's `manhunt.yml` under `spawn-points`.
 3.  **Start Generation**: Use the command `/wp start` to begin the generation process.
 4.  **Check Progress**: Use `/wp status` to monitor the progress.
 5.  **Stop Generation**: Use `/wp stop` to pause the generation.

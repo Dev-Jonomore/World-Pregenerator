@@ -501,35 +501,23 @@ public class GenerationTask {
   }
 
   private String buildManhuntYmlContent(World world, SeedEntry seed) {
-    String direction = calculateDirection(seed, world.getSpawnLocation());
-    return "seed: " + seed.seed() + "\n" +
-        "spawn:\n" +
-        "  x: " + world.getSpawnLocation().getBlockX() + "\n" +
-        "  y: " + world.getSpawnLocation().getBlockY() + "\n" +
-        "  z: " + world.getSpawnLocation().getBlockZ() + "\n" +
-        "coordinate-hint:\n" +
-        "  x: " + seed.hintX() + "\n" +
-        "  z: " + seed.hintZ() + "\n" +
-        "direction-hint: " + direction + "\n" +
-        "pregen-radius: " + config.getGenerationRadius() + "\n" +
-        "worlds:\n" +
-        "  overworld: " + world.getName() + '\n';
-  }
-
-  private String calculateDirection(SeedEntry seed, Location spawn) {
-    double deltaX = seed.hintX() - spawn.getX();
-    double deltaZ = seed.hintZ() - spawn.getZ();
-    double angle = Math.toDegrees(Math.atan2(deltaZ, deltaX));
-    if (angle < 0) angle += 360;
-    if (angle >= 337.5 || angle < 22.5) return "EAST";
-    if (angle >= 22.5 && angle < 67.5) return "SOUTHEAST";
-    if (angle >= 67.5 && angle < 112.5) return "SOUTH";
-    if (angle >= 112.5 && angle < 157.5) return "SOUTHWEST";
-    if (angle >= 157.5 && angle < 202.5) return "WEST";
-    if (angle >= 202.5 && angle < 247.5) return "NORTHWEST";
-    if (angle >= 247.5 && angle < 292.5) return "NORTH";
-    if (angle >= 292.5 && angle < 337.5) return "NORTHEAST";
-    return "Unknown";
+    StringBuilder yml = new StringBuilder()
+        .append("seed: ").append(seed.seed()).append('\n')
+        .append("spawn:\n")
+        .append("  x: ").append(world.getSpawnLocation().getBlockX()).append('\n')
+        .append("  y: ").append(world.getSpawnLocation().getBlockY()).append('\n')
+        .append("  z: ").append(world.getSpawnLocation().getBlockZ()).append('\n')
+        .append("spawn-points:\n");
+    for (SpawnPoint point : seed.spawnPoints()) {
+      yml.append("  - x: ").append(point.x()).append('\n')
+          .append("    y: ").append(point.y()).append('\n')
+          .append("    z: ").append(point.z()).append('\n');
+    }
+    return yml
+        .append("pregen-radius: ").append(config.getGenerationRadius()).append('\n')
+        .append("worlds:\n")
+        .append("  overworld: ").append(world.getName()).append('\n')
+        .toString();
   }
 
   private void saveState() {

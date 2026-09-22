@@ -8,6 +8,9 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
@@ -40,8 +43,7 @@ import java.util.zip.ZipFile;
 public record ManhuntYaml(
     long seed,
     Vector spawn,
-    Vector coordinateHint,
-    String directionHint,
+    List<Vector> spawnPoints,
     int pregenRadius,
     // worlds section — overworld always present, nether/end may be null (pregenerator zips)
     String overworldFolderName,
@@ -105,13 +107,14 @@ public record ManhuntYaml(
         config.getInt("spawn.z")
     );
 
-    Vector coordinateHint = new Vector(
-        config.getInt("coordinate-hint.x"),
-        0,
-        config.getInt("coordinate-hint.z")
-    );
-
-    String directionHint = config.getString("direction-hint", "NORTH");
+    List<Vector> spawnPoints = new ArrayList<>();
+    for (Map<?, ?> point : config.getMapList("spawn-points")) {
+      spawnPoints.add(new Vector(
+          ((Number) point.get("x")).intValue(),
+          ((Number) point.get("y")).intValue(),
+          ((Number) point.get("z")).intValue()
+      ));
+    }
 
     int pregenRadius = config.getInt("pregen-radius", 0);
 
@@ -125,7 +128,7 @@ public record ManhuntYaml(
     String endFolderName = config.getString("worlds.end", null);
 
     return new ManhuntYaml(
-        seed, spawn, coordinateHint, directionHint, pregenRadius,
+        seed, spawn, List.copyOf(spawnPoints), pregenRadius,
         overworldFolderName, netherFolderName, endFolderName
     );
   }
