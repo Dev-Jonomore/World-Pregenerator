@@ -5,6 +5,7 @@ import mc.jonomore.worldPregenerator.WorldPregenerator;
 import mc.jonomore.worldPregenerator.config.ConfigManager;
 import mc.jonomore.worldPregenerator.logic.CageBuilder;
 import mc.jonomore.worldPregenerator.logic.SpawnAdjuster;
+import mc.jonomore.worldPregenerator.logic.StructureFinder;
 import mc.jonomore.worldPregenerator.util.FileUtils;
 import org.bukkit.*;
 import org.bukkit.scheduler.BukkitTask;
@@ -43,6 +44,7 @@ public class GenerationTask {
   private final ChunkyAPI chunky;
   private final SpawnAdjuster spawnAdjuster;
   private final CageBuilder cageBuilder;
+  private final StructureFinder structureFinder;
   private final ErrorHandler errorHandler;
   private final GenerationState state;
   private final File stateFile;
@@ -74,6 +76,12 @@ public class GenerationTask {
     errorHandler = new ErrorHandler(logger);
     spawnAdjuster = new SpawnAdjuster(config.getMaxSearchRadius(), config.getMaxVerticalScan());
     cageBuilder = new CageBuilder(config.getCageMaterial(), config.getCageRadius(), config.getCageHeight());
+    structureFinder = new StructureFinder(
+        logger,
+        config.getStructureFinderStructures(),
+        config.isStructureFinderWhitelist(),
+        config.getStructureFinderSearchRadius()
+    );
     this.state.setTotalSeeds(seeds.size());
     this.testMode = testMode;
 
@@ -271,8 +279,16 @@ public class GenerationTask {
           }
         }
 
+        StructureFinder.Result structure = structureFinder.findNearest(world, world.getSpawnLocation());
+        if (structure != null) {
+          Location loc = structure.location();
+          logger.info("Nearest structure: " + structure.type() + " at " + loc.getBlockX() + ", " + loc.getBlockY() + ", " + loc.getBlockZ() + " (" + structure.direction() + ")");
+        } else {
+          logger.warning("No matching structure found within " + config.getStructureFinderSearchRadius() + " blocks of spawn in " + worldName);
+        }
+
         SeedEntry seedEntry = seeds.get(state.getCurrentIndex());
-        state.setPendingManhuntYml(buildManhuntYmlContent(world, seedEntry));
+        state.setPendingManhuntYml(buildManhuntYmlContent(world, seedEntry, structure));
 
         // Cage
         cageBuilder.buildCage(world);
@@ -500,7 +516,7 @@ public class GenerationTask {
     }
   }
 
-  private String buildManhuntYmlContent(World world, SeedEntry seed) {
+  private String buildManhuntYmlContent(World world, SeedEntry seed, StructureFinder.Result structure) {
     StringBuilder yml = new StringBuilder()
         .append("seed: ").append(seed.seed()).append('\n')
         .append("spawn:\n")
@@ -512,6 +528,14 @@ public class GenerationTask {
       yml.append("  - x: ").append(point.x()).append('\n')
           .append("    y: ").append(point.y()).append('\n')
           .append("    z: ").append(point.z()).append('\n');
+    }
+    if (structure != null) {
+      yml.append("nearest-structure:\n")
+          .append("  type: ").append(structure.type()).append('\n')
+          .append("  x: ").append(structure.location().getBlockX()).append('\n')
+          .append("  y: ").append(structure.location().getBlockY()).append('\n')
+          .append("  z: ").append(structure.location().getBlockZ()).append('\n')
+          .append("  direction: ").append(structure.direction()).append('\n');
     }
     return yml
         .append("pregen-radius: ").append(config.getGenerationRadius()).append('\n')

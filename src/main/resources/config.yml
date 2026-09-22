@@ -12,4 +12,27 @@ cage-building:
 batch-settings:
   worlds-per-batch: 10
   pause-between-batches: 60
-world-delay-ticks: 40
+structure-finder:
+  # true: only search for the listed structures. false: search for every structure except the listed ones.
+  whitelist: true
+  # How far from spawn to search, in blocks.
+  search-radius: 1200
+  # Structure keys, e.g. village_plains or minecraft:desert_pyramid
+  structures:
+    - village_plains
+    - village_desert
+    - village_savanna
+    - village_snowy
+    - village_taiga
+    - desert_pyramid
+    - jungle_pyramid
+    - pillager_outpost
+    - shipwreck
+    - shipwreck_beached
+    - ruined_portal
+    - ruined_portal_desert
+    - ruined_portal_jungle
+    - ruined_portal_mountain
+    - ruined_portal_ocean
+    - ruined_portal_swamp
+world-delay-ticks: 4

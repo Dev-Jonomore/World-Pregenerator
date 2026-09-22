@@ -3,6 +3,7 @@ package mc.jonomore.worldPregenerator.config;
 import mc.jonomore.worldPregenerator.WorldPregenerator;
 import org.bukkit.Material;
 import java.io.File;
+import java.util.List;
 
 public class
 ConfigManager {
@@ -21,6 +22,9 @@ ConfigManager {
   private long worldDelayTicks;
   private int worldsPerBatch;
   private long pauseBetweenBatches;
+  private List<String> structureFinderStructures;
+  private boolean structureFinderWhitelist;
+  private int structureFinderSearchRadius;
 
   public ConfigManager(WorldPregenerator plugin) {
     this.plugin = plugin;
@@ -100,6 +104,14 @@ ConfigManager {
         plugin.getLogger().warning("pause-between-batches cannot be negative: " + pauseBetweenBatches + ". Defaulting to 60.");
         pauseBetweenBatches = 60L;
     }
+
+    structureFinderStructures = plugin.getConfig().getStringList("structure-finder.structures");
+    structureFinderWhitelist = plugin.getConfig().getBoolean("structure-finder.whitelist", true);
+    structureFinderSearchRadius = plugin.getConfig().getInt("structure-finder.search-radius", 1200);
+    if (structureFinderSearchRadius < 16 || structureFinderSearchRadius > 10000) {
+        plugin.getLogger().warning("structure-finder.search-radius out of range [16,10000]: " + structureFinderSearchRadius + ". Defaulting to 1200.");
+        structureFinderSearchRadius = 1200;
+    }
   }
 
   public int getGenerationRadius() {
@@ -134,6 +146,12 @@ ConfigManager {
 
   public long getPauseBetweenBatches() { return pauseBetweenBatches; }
 
+  public List<String> getStructureFinderStructures() { return structureFinderStructures; }
+
+  public boolean isStructureFinderWhitelist() { return structureFinderWhitelist; }
+
+  public int getStructureFinderSearchRadius() { return structureFinderSearchRadius; }
+
   @Override
   public String toString() {
     return "generation-radius: " + generationRadius + "\n" +
@@ -150,6 +168,10 @@ ConfigManager {
         "batch-settings:\n" +
         "  worlds-per-batch: " + worldsPerBatch + "\n" +
         "  pause-between-batches: " + pauseBetweenBatches + "\n" +
+        "structure-finder:\n" +
+        "  whitelist: " + structureFinderWhitelist + "\n" +
+        "  search-radius: " + structureFinderSearchRadius + "\n" +
+        "  structures: " + structureFinderStructures + "\n" +
         "world-delay-ticks: " + worldDelayTicks;
   }
 }

@@ -44,6 +44,10 @@ public record ManhuntYaml(
     long seed,
     Vector spawn,
     List<Vector> spawnPoints,
+    // nearest-structure section — all null if no structure was found
+    String nearestStructureType,
+    Vector nearestStructure,
+    String nearestStructureDirection,
     int pregenRadius,
     // worlds section — overworld always present, nether/end may be null (pregenerator zips)
     String overworldFolderName,
@@ -116,6 +120,18 @@ public record ManhuntYaml(
       ));
     }
 
+    String nearestStructureType = config.getString("nearest-structure.type", null);
+    Vector nearestStructure = null;
+    String nearestStructureDirection = null;
+    if (nearestStructureType != null) {
+      nearestStructure = new Vector(
+          config.getInt("nearest-structure.x"),
+          config.getInt("nearest-structure.y"),
+          config.getInt("nearest-structure.z")
+      );
+      nearestStructureDirection = config.getString("nearest-structure.direction", null);
+    }
+
     int pregenRadius = config.getInt("pregen-radius", 0);
 
     // worlds section — overworld required, nether/end optional
@@ -128,7 +144,8 @@ public record ManhuntYaml(
     String endFolderName = config.getString("worlds.end", null);
 
     return new ManhuntYaml(
-        seed, spawn, List.copyOf(spawnPoints), pregenRadius,
+        seed, spawn, List.copyOf(spawnPoints),
+        nearestStructureType, nearestStructure, nearestStructureDirection, pregenRadius,
         overworldFolderName, netherFolderName, endFolderName
     );
   }
