@@ -17,7 +17,7 @@ import java.util.Set;
 import java.util.logging.Logger;
 
 /**
- * Locates the structure nearest to a world's spawn, restricted to a configured
+ * Locates the structure nearest to a point (e.g. a spawn point), restricted to a configured
  * whitelist or blacklist of structure keys (e.g. {@code village_plains}).
  */
 public class StructureFinder {

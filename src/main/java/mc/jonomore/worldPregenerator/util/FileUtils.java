@@ -39,7 +39,7 @@ public class FileUtils {
 
     try {
       ManhuntYaml YAML = ManhuntYaml.fromZip(zipPath);
-      if (YAML.spawnPoints().isEmpty() || YAML.overworldFolderName() == null) {
+      if (YAML.spawnPoints() == null || YAML.spawnPoints().isEmpty()) {
         throw new IOException("Zip file missing critical world metadata in manhunt.yml: " + zipPath);
       }
     } catch (IOException e) {

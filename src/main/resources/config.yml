@@ -15,7 +15,7 @@ batch-settings:
 structure-finder:
   # true: only search for the listed structures. false: search for every structure except the listed ones.
   whitelist: true
-  # How far from spawn to search, in blocks.
+  # How far from each spawn point to search for its nearest structure, in blocks.
   search-radius: 1200
   # Structure keys, e.g. village_plains or minecraft:desert_pyramid
   structures:

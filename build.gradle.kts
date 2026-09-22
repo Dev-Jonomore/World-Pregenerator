@@ -22,6 +22,7 @@ repositories {
 dependencies {
     compileOnly("io.papermc.paper:paper-api:26.1.2.build.+")
     compileOnly(group = "org.popcraft", name = "chunky-common", version = "1.3.38")
+    implementation("org.spongepowered:configurate-yaml:4.2.0")
 }
 
 java {
@@ -50,5 +51,15 @@ tasks {
 
     shadowJar {
         archiveClassifier = ""
+        // Paper bundles its own Configurate; relocate ours to avoid clashes
+        mergeServiceFiles()
+        val libs = "mc.jonomore.worldPregenerator.libs"
+        relocate("org.spongepowered.configurate", "$libs.configurate")
+        relocate("io.leangen.geantyref", "$libs.geantyref")
+        relocate("net.kyori.option", "$libs.option")
+    }
+
+    build {
+        dependsOn(shadowJar)
     }
 }

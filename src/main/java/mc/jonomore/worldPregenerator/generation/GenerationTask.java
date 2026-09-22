@@ -7,6 +7,7 @@ import mc.jonomore.worldPregenerator.logic.CageBuilder;
 import mc.jonomore.worldPregenerator.logic.SpawnAdjuster;
 import mc.jonomore.worldPregenerator.logic.StructureFinder;
 import mc.jonomore.worldPregenerator.util.FileUtils;
+import mc.jonomore.worldPregenerator.util.ManhuntYaml;
 import org.bukkit.*;
 import org.bukkit.scheduler.BukkitTask;
 import org.jspecify.annotations.NonNull;
@@ -17,6 +18,7 @@ import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 import java.nio.file.attribute.BasicFileAttributes;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import java.util.logging.Level;
@@ -279,16 +281,8 @@ public class GenerationTask {
           }
         }
 
-        StructureFinder.Result structure = structureFinder.findNearest(world, world.getSpawnLocation());
-        if (structure != null) {
-          Location loc = structure.location();
-          logger.info("Nearest structure: " + structure.type() + " at " + loc.getBlockX() + ", " + loc.getBlockY() + ", " + loc.getBlockZ() + " (" + structure.direction() + ")");
-        } else {
-          logger.warning("No matching structure found within " + config.getStructureFinderSearchRadius() + " blocks of spawn in " + worldName);
-        }
-
         SeedEntry seedEntry = seeds.get(state.getCurrentIndex());
-        state.setPendingManhuntYml(buildManhuntYmlContent(world, seedEntry, structure));
+        state.setPendingManhuntYml(buildManhuntYml(world, seedEntry).toYamlString());
 
         // Cage
         cageBuilder.buildCage(world);
@@ -516,32 +510,35 @@ public class GenerationTask {
     }
   }
 
-  private String buildManhuntYmlContent(World world, SeedEntry seed, StructureFinder.Result structure) {
-    StringBuilder yml = new StringBuilder()
-        .append("seed: ").append(seed.seed()).append('\n')
-        .append("spawn:\n")
-        .append("  x: ").append(world.getSpawnLocation().getBlockX()).append('\n')
-        .append("  y: ").append(world.getSpawnLocation().getBlockY()).append('\n')
-        .append("  z: ").append(world.getSpawnLocation().getBlockZ()).append('\n')
-        .append("spawn-points:\n");
+  private ManhuntYaml buildManhuntYml(World world, SeedEntry seed) {
+    List<ManhuntYaml.SpawnPoint> spawnPoints = new ArrayList<>();
     for (SpawnPoint point : seed.spawnPoints()) {
-      yml.append("  - x: ").append(point.x()).append('\n')
-          .append("    y: ").append(point.y()).append('\n')
-          .append("    z: ").append(point.z()).append('\n');
+      Location origin = new Location(world, point.x(), point.y(), point.z());
+      StructureFinder.Result structure = structureFinder.findNearest(world, origin);
+      ManhuntYaml.NearestStructure nearest = null;
+      if (structure != null) {
+        Location loc = structure.location();
+        logger.info("Nearest structure to spawn point " + point.x() + ", " + point.y() + ", " + point.z() + ": "
+            + structure.type() + " at " + loc.getBlockX() + ", " + loc.getBlockY() + ", " + loc.getBlockZ()
+            + " (" + structure.direction() + ")");
+        nearest = new ManhuntYaml.NearestStructure(
+            structure.type(), loc.getBlockX(), loc.getBlockY(), loc.getBlockZ(), structure.direction()
+        );
+      } else {
+        logger.warning("No matching structure within " + config.getStructureFinderSearchRadius()
+            + " blocks of spawn point " + point.x() + ", " + point.y() + ", " + point.z() + " in " + world.getName());
+      }
+      spawnPoints.add(new ManhuntYaml.SpawnPoint(point.x(), point.y(), point.z(), nearest));
     }
-    if (structure != null) {
-      yml.append("nearest-structure:\n")
-          .append("  type: ").append(structure.type()).append('\n')
-          .append("  x: ").append(structure.location().getBlockX()).append('\n')
-          .append("  y: ").append(structure.location().getBlockY()).append('\n')
-          .append("  z: ").append(structure.location().getBlockZ()).append('\n')
-          .append("  direction: ").append(structure.direction()).append('\n');
-    }
-    return yml
-        .append("pregen-radius: ").append(config.getGenerationRadius()).append('\n')
-        .append("worlds:\n")
-        .append("  overworld: ").append(world.getName()).append('\n')
-        .toString();
+
+    Location spawn = world.getSpawnLocation();
+    return new ManhuntYaml(
+        seed.seed(),
+        new ManhuntYaml.BlockPos(spawn.getBlockX(), spawn.getBlockY(), spawn.getBlockZ()),
+        spawnPoints,
+        config.getGenerationRadius(),
+        new ManhuntYaml.Worlds(world.getName(), null, null)
+    );
   }
 
   private void saveState() {

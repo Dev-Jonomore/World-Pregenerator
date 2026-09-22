@@ -2,12 +2,18 @@ package mc.jonomore.worldPregenerator.config;
 
 import mc.jonomore.worldPregenerator.WorldPregenerator;
 import org.bukkit.Material;
-import java.io.File;
-import java.util.List;
+import org.spongepowered.configurate.CommentedConfigurationNode;
+import org.spongepowered.configurate.yaml.NodeStyle;
+import org.spongepowered.configurate.yaml.YamlConfigurationLoader;
 
-public class
-ConfigManager {
+import java.io.File;
+import java.io.IOException;
+import java.util.List;
+import java.util.logging.Level;
+
+public class ConfigManager {
   private final WorldPregenerator plugin;
+  private final YamlConfigurationLoader loader;
 
   // Cached config values
   private int generationRadius;
@@ -29,44 +35,58 @@ ConfigManager {
   public ConfigManager(WorldPregenerator plugin) {
     this.plugin = plugin;
     plugin.saveDefaultConfig();
+    this.loader = YamlConfigurationLoader.builder()
+        .path(plugin.getDataFolder().toPath().resolve("config.yml"))
+        .nodeStyle(NodeStyle.BLOCK)
+        .indent(2)
+        .build();
     loadConfig();
   }
 
+  /**
+   * Loads and validates config.yml. Missing keys fall back to the defaults in {@link PluginConfig}.
+   */
   public void loadConfig() {
-    plugin.reloadConfig();
-    
-    generationRadius = plugin.getConfig().getInt("generation-radius", 1200);
+    PluginConfig cfg;
+    try {
+      cfg = loader.load().get(PluginConfig.class);
+    } catch (IOException e) {
+      plugin.getLogger().log(Level.SEVERE, "Failed to load config.yml; using defaults", e);
+      cfg = new PluginConfig();
+    }
+
+    generationRadius = cfg.generationRadius;
     if (generationRadius < 100 || generationRadius > 10000) {
         plugin.getLogger().warning("generation-radius out of range [100,10000]: " + generationRadius + ". Defaulting to 1200.");
         generationRadius = 1200;
     }
 
-    exportPath = plugin.getConfig().getString("export-path", "exported_worlds");
-    serverId = plugin.getConfig().getString("server-id", "default");
+    exportPath = cfg.exportPath;
+    serverId = cfg.serverId;
     File exportDir = new File(exportPath);
     if (!exportDir.exists() && !exportDir.mkdirs()) {
         plugin.getLogger().warning("export-path directory could not be created or found: " + exportPath);
     }
 
-    seedsFile = plugin.getConfig().getString("seeds-file", "seeds.txt");
+    seedsFile = cfg.seedsFile;
     File sFile = new File(seedsFile);
     if (!sFile.exists()) {
         plugin.getLogger().warning("seeds-file does not exist: " + seedsFile);
     }
 
-    maxSearchRadius = plugin.getConfig().getInt("spawn-adjustment.maxSearchRadius", 100);
+    maxSearchRadius = cfg.spawnAdjustment.maxSearchRadius;
     if (maxSearchRadius < 10 || maxSearchRadius > 256) {
         plugin.getLogger().warning("maxSearchRadius out of range [10,256]: " + maxSearchRadius + ". Defaulting to 100.");
         maxSearchRadius = 100;
     }
 
-    maxVerticalScan = plugin.getConfig().getInt("spawn-adjustment.maxVerticalScan", 128);
+    maxVerticalScan = cfg.spawnAdjustment.maxVerticalScan;
     if (maxVerticalScan < 10 || maxVerticalScan > 256) {
         plugin.getLogger().warning("maxVerticalScan out of range [10,256]: " + maxVerticalScan + ". Defaulting to 128.");
         maxVerticalScan = 128;
     }
 
-    String cageMaterialName = plugin.getConfig().getString("cage-building.cage-material", "PURPLE_STAINED_GLASS");
+    String cageMaterialName = cfg.cageBuilding.cageMaterial;
     Material parsedMaterial = Material.getMaterial(cageMaterialName);
     if (parsedMaterial == null) {
       plugin.getLogger().warning("Invalid cage material: '" + cageMaterialName + "'. Defaulting to 'PURPLE_STAINED_GLASS'");
@@ -75,43 +95,56 @@ ConfigManager {
       cageMaterial = parsedMaterial;
     }
 
-    cageRadius = plugin.getConfig().getInt("cage-building.cage-radius", 4);
+    cageRadius = cfg.cageBuilding.cageRadius;
     if (cageRadius < 2 || cageRadius > 10) {
         plugin.getLogger().warning("cage-radius out of range [2,10]: " + cageRadius + ". Defaulting to 4.");
         cageRadius = 4;
     }
 
-    cageHeight = plugin.getConfig().getInt("cage-building.cage-height", 3);
+    cageHeight = cfg.cageBuilding.cageHeight;
     if (cageHeight < 3 || cageHeight > 9 || cageHeight % 2 == 0) {
         plugin.getLogger().warning("cage-height must be an odd number between 3-9: " + cageHeight + ". Defaulting to 3.");
         cageHeight = 3;
     }
     
-    worldDelayTicks = plugin.getConfig().getLong("world-delay-ticks", 40L);
+    worldDelayTicks = cfg.worldDelayTicks;
     if (worldDelayTicks < 0) {
         plugin.getLogger().warning("world-delay-ticks cannot be negative: " + worldDelayTicks + ". Defaulting to 40.");
         worldDelayTicks = 40L;
     }
 
-    worldsPerBatch = plugin.getConfig().getInt("batch-settings.worlds-per-batch", 10);
+    worldsPerBatch = cfg.batchSettings.worldsPerBatch;
     if (worldsPerBatch <= 0) {
         plugin.getLogger().warning("worlds-per-batch must be positive: " + worldsPerBatch + ". Defaulting to 10.");
         worldsPerBatch = 10;
     }
 
-    pauseBetweenBatches = plugin.getConfig().getLong("batch-settings.pause-between-batches", 60L);
+    pauseBetweenBatches = cfg.batchSettings.pauseBetweenBatches;
     if (pauseBetweenBatches < 0) {
         plugin.getLogger().warning("pause-between-batches cannot be negative: " + pauseBetweenBatches + ". Defaulting to 60.");
         pauseBetweenBatches = 60L;
     }
 
-    structureFinderStructures = plugin.getConfig().getStringList("structure-finder.structures");
-    structureFinderWhitelist = plugin.getConfig().getBoolean("structure-finder.whitelist", true);
-    structureFinderSearchRadius = plugin.getConfig().getInt("structure-finder.search-radius", 1200);
+    structureFinderStructures = List.copyOf(cfg.structureFinder.structures);
+    structureFinderWhitelist = cfg.structureFinder.whitelist;
+    structureFinderSearchRadius = cfg.structureFinder.searchRadius;
     if (structureFinderSearchRadius < 16 || structureFinderSearchRadius > 10000) {
         plugin.getLogger().warning("structure-finder.search-radius out of range [16,10000]: " + structureFinderSearchRadius + ". Defaulting to 1200.");
         structureFinderSearchRadius = 1200;
     }
+  }
+
+  /**
+   * Sets a single value in config.yml and reloads. {@code path} is dot-separated, e.g.
+   * {@code cage-building.cage-radius}. The value is stored as a string and converted to the
+   * field's type on load. Configurate's YAML loader does not preserve comments, so saving
+   * strips them from the file.
+   */
+  public void set(String path, String value) throws IOException {
+    CommentedConfigurationNode root = loader.load();
+    root.node((Object[]) path.split("\\.")).set(value);
+    loader.save(root);
+    loadConfig();
   }
 
   public int getGenerationRadius() {

@@ -24,6 +24,8 @@ A Paper/Bukkit plugin that batch-generates Minecraft worlds from a seed list, co
 
 The `config.yml` file contains the following settings:
 
+Missing keys fall back to their defaults. Note that `/wp config` rewrites the file and removes its comments.
+
 *   `generation-radius`: The radius in blocks for Chunky to pre-generate. (Range: 100-10000, Default: 1200)
 *   `export-path`: The directory where exported `.slime` files will be saved.
 *   `seeds-file`: The path to the file containing the list of seeds to generate.
@@ -35,9 +37,9 @@ The `config.yml` file contains the following settings:
     *   `cage-material`: The material to use for the protective cage. (Default: `PURPLE_STAINED_GLASS`)
     *   `cage-radius`: The radius of the cage. (Range: 2-10, Default: 4)
     *   `cage-height`: The height of the cage. Must be an odd number. (Range: 3-9, Default: 3)
-*   `structure-finder`: After chunk generation, the nearest matching structure to spawn is written to `manhunt.yml` under `nearest-structure` (type, x/y/z, and direction from spawn).
+*   `structure-finder`: After chunk generation, the nearest matching structure to each spawn point is written to that spawn point's entry in `manhunt.yml` under `nearest-structure` (type, x/y/z, and direction from the spawn point).
     *   `whitelist`: If `true`, only the listed structures are searched for; if `false`, every structure except the listed ones is. (Default: `true`)
-    *   `search-radius`: How far from spawn to search, in blocks. (Range: 16-10000, Default: 1200)
+    *   `search-radius`: How far from each spawn point to search, in blocks. (Range: 16-10000, Default: 1200)
     *   `structures`: Structure keys such as `village_plains` or `minecraft:desert_pyramid`.
 
 ## Command Reference

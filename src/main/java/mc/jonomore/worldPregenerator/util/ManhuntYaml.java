@@ -1,16 +1,22 @@
 package mc.jonomore.worldPregenerator.util;
 
-import org.bukkit.configuration.file.YamlConfiguration;
-import org.bukkit.util.Vector;
+import org.jspecify.annotations.Nullable;
+import org.spongepowered.configurate.CommentedConfigurationNode;
+import org.spongepowered.configurate.ConfigurateException;
+import org.spongepowered.configurate.objectmapping.ConfigSerializable;
+import org.spongepowered.configurate.objectmapping.meta.Setting;
+import org.spongepowered.configurate.yaml.NodeStyle;
+import org.spongepowered.configurate.yaml.YamlConfigurationLoader;
 
+import java.io.BufferedReader;
+import java.io.BufferedWriter;
 import java.io.File;
 import java.io.IOException;
-import java.io.InputStream;
-import java.nio.file.Files;
+import java.io.InputStreamReader;
+import java.io.StringWriter;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
-import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
@@ -40,22 +46,62 @@ import java.util.zip.ZipFile;
  * to {@code mh_overworld}. If nether/end are absent, WorldManager creates them fresh with
  * the same seed.
  */
+@ConfigSerializable
 public record ManhuntYaml(
-    long seed,
-    Vector spawn,
-    List<Vector> spawnPoints,
-    // nearest-structure section — all null if no structure was found
-    String nearestStructureType,
-    Vector nearestStructure,
-    String nearestStructureDirection,
-    int pregenRadius,
-    // worlds section — overworld always present, nether/end may be null (pregenerator zips)
-    String overworldFolderName,
-    String netherFolderName,   // null if not present
-    String endFolderName       // null if not present
+    @Setting("seed") long seed,
+    @Setting("spawn") BlockPos spawn,
+    @Setting("spawn-points") List<SpawnPoint> spawnPoints,
+    @Setting("pregen-radius") int pregenRadius,
+    @Setting("worlds") Worlds worlds
 ) {
 
   public static final String FILE_NAME = "manhunt.yml";
+
+  @ConfigSerializable
+  public record BlockPos(
+      @Setting("x") int x,
+      @Setting("y") int y,
+      @Setting("z") int z
+  ) {}
+
+  /**
+   * A spawn point and the nearest structure to it, if one was found within the search radius.
+   */
+  @ConfigSerializable
+  public record SpawnPoint(
+      @Setting("x") int x,
+      @Setting("y") int y,
+      @Setting("z") int z,
+      @Setting("nearest-structure") @Nullable NearestStructure nearestStructure
+  ) {
+    public SpawnPoint {
+      // Configurate maps a missing section to an empty object rather than null
+      if (nearestStructure != null && nearestStructure.type() == null) nearestStructure = null;
+    }
+  }
+
+  /**
+   * @param type      namespaced structure key, e.g. {@code minecraft:village_plains}
+   * @param direction compass direction from the spawn point to the structure, e.g. {@code NORTHEAST}
+   */
+  @ConfigSerializable
+  public record NearestStructure(
+      @Setting("type") String type,
+      @Setting("x") int x,
+      @Setting("y") int y,
+      @Setting("z") int z,
+      @Setting("direction") String direction
+  ) {}
+
+  /**
+   * World folder names. Overworld is always present; nether/end are null in pregenerator zips.
+   */
+  @ConfigSerializable
+  public record Worlds(
+      @Setting("overworld") String overworld,
+      @Setting("nether") @Nullable String nether,
+      @Setting("end") @Nullable String end
+  ) {}
 
   // ---------------------------------------------------------------------------
   // Parsing
@@ -74,17 +120,9 @@ public record ManhuntYaml(
       if (entry == null) {
         throw new IOException("manhunt.yml not found in zip: " + zipPath);
       }
-      // Write to a temp file so YamlConfiguration can read it
-      // (YamlConfiguration doesn't read from streams directly)
-      Path temp = Files.createTempFile("manhunt", ".yml");
-      try {
-        try (InputStream in = zf.getInputStream(entry)) {
-          Files.copy(in, temp, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
-        }
-        return fromFile(temp.toFile());
-      } finally {
-        Files.deleteIfExists(temp);
-      }
+      return load(baseLoader().source(() -> new BufferedReader(
+          new InputStreamReader(zf.getInputStream(entry), StandardCharsets.UTF_8)
+      )).build());
     }
   }
 
@@ -100,54 +138,36 @@ public record ManhuntYaml(
     if (!file.exists()) {
       throw new IOException("manhunt.yml not found at: " + file.getAbsolutePath());
     }
-
-    YamlConfiguration config = YamlConfiguration.loadConfiguration(file);
-
-    long seed = config.getLong("seed");
-
-    Vector spawn = new Vector(
-        config.getInt("spawn.x"),
-        config.getInt("spawn.y"),
-        config.getInt("spawn.z")
-    );
-
-    List<Vector> spawnPoints = new ArrayList<>();
-    for (Map<?, ?> point : config.getMapList("spawn-points")) {
-      spawnPoints.add(new Vector(
-          ((Number) point.get("x")).intValue(),
-          ((Number) point.get("y")).intValue(),
-          ((Number) point.get("z")).intValue()
-      ));
-    }
-
-    String nearestStructureType = config.getString("nearest-structure.type", null);
-    Vector nearestStructure = null;
-    String nearestStructureDirection = null;
-    if (nearestStructureType != null) {
-      nearestStructure = new Vector(
-          config.getInt("nearest-structure.x"),
-          config.getInt("nearest-structure.y"),
-          config.getInt("nearest-structure.z")
-      );
-      nearestStructureDirection = config.getString("nearest-structure.direction", null);
-    }
-
-    int pregenRadius = config.getInt("pregen-radius", 0);
-
-    // worlds section — overworld required, nether/end optional
-    String overworldFolderName = config.getString("worlds.overworld");
-    if (overworldFolderName == null || overworldFolderName.isBlank()) {
-      throw new IOException("manhunt.yml is missing required field: worlds.overworld");
-    }
-
-    String netherFolderName = config.getString("worlds.nether", null);
-    String endFolderName = config.getString("worlds.end", null);
-
-    return new ManhuntYaml(
-        seed, spawn, List.copyOf(spawnPoints),
-        nearestStructureType, nearestStructure, nearestStructureDirection, pregenRadius,
-        overworldFolderName, netherFolderName, endFolderName
-    );
+    return load(baseLoader().path(file.toPath()).build());
   }
 
+  private static ManhuntYaml load(YamlConfigurationLoader loader) throws IOException {
+    ManhuntYaml yaml = loader.load().get(ManhuntYaml.class);
+    if (yaml == null || yaml.worlds() == null || yaml.worlds().overworld() == null || yaml.worlds().overworld().isBlank()) {
+      throw new IOException("manhunt.yml is missing required field: worlds.overworld");
+    }
+    return yaml;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Serialization
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Serializes this object to the YAML text written into world zips.
+   */
+  public String toYamlString() throws ConfigurateException {
+    StringWriter out = new StringWriter();
+    YamlConfigurationLoader loader = baseLoader().sink(() -> new BufferedWriter(out)).build();
+    CommentedConfigurationNode root = loader.createNode();
+    root.set(ManhuntYaml.class, this);
+    loader.save(root);
+    return out.toString();
+  }
+
+  private static YamlConfigurationLoader.Builder baseLoader() {
+    return YamlConfigurationLoader.builder()
+        .nodeStyle(NodeStyle.BLOCK)
+        .indent(2);
+  }
 }
