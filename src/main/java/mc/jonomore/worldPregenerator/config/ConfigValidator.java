@@ -1,6 +1,7 @@
 package mc.jonomore.worldPregenerator.config;
 
 import mc.jonomore.worldPregenerator.WorldPregenerator;
+import mc.jonomore.worldPregenerator.generation.SeedParser;
 import org.bukkit.Bukkit;
 import org.popcraft.chunky.api.ChunkyAPI;
 
@@ -34,9 +35,17 @@ public class ConfigValidator {
             results.add("<red> - FAILED: Seed file is not readable.");
         } else {
             try (Stream<String> lines = Files.lines(seedFile.toPath())) {
-                long count = lines.count();
-                results.add("<green> - SUCCESS: Found " + count + " seeds.");
-                
+                SeedCount seeds = countSeeds(lines);
+                long count = seeds.valid();
+                if (count == 0) {
+                    results.add("<red> - FAILED: No valid seeds found.");
+                } else {
+                    results.add("<green> - SUCCESS: Found " + count + " valid seeds.");
+                }
+                if (seeds.invalid() > 0) {
+                    results.add("<yellow> - WARNING: " + seeds.invalid() + " line(s) don't match the seed format and will be skipped.");
+                }
+
                 // 3. Estimate disk space
                 double perWorldGB = estimateWorldSizeGB(config.getGenerationRadius());
                 results.add(String.format("<yellow> - Estimated size per world: ~%.2f GB", perWorldGB));
@@ -68,6 +77,23 @@ public class ConfigValidator {
         }
 
         return results;
+    }
+
+    /** Number of valid and invalid non-blank lines in a seeds file. */
+    record SeedCount(long valid, long invalid) {}
+
+    static SeedCount countSeeds(Stream<String> lines) {
+        long valid = 0;
+        long invalid = 0;
+        for (String line : (Iterable<String>) lines.filter(l -> !l.isBlank())::iterator) {
+            try {
+                SeedParser.parse(line);
+                valid++;
+            } catch (IllegalArgumentException e) {
+                invalid++;
+            }
+        }
+        return new SeedCount(valid, invalid);
     }
 
     /**
