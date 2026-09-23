@@ -34,6 +34,12 @@ public final class WorldPregenerator extends JavaPlugin {
       return;
     }
 
+    // A finished task (including a completed test-one) can't be resumed; start a new one
+    if (task != null && task.isFinished()) {
+      if (task.isTestMode()) state = null;
+      task = null;
+    }
+
     if (task == null) {
       getLogger().info("No task found, creating a new one.");
       List<SeedEntry> allSeeds = readSeeds();

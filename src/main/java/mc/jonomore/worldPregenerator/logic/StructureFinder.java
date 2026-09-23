@@ -2,7 +2,6 @@ package mc.jonomore.worldPregenerator.logic;
 
 import io.papermc.paper.registry.RegistryAccess;
 import io.papermc.paper.registry.RegistryKey;
-import org.bukkit.HeightMap;
 import org.bukkit.Location;
 import org.bukkit.NamespacedKey;
 import org.bukkit.Registry;
@@ -29,10 +28,11 @@ public class StructureFinder {
    * A located structure.
    *
    * @param type      namespaced key of the structure, e.g. {@code minecraft:village_plains}
-   * @param location  center of the structure in x/z, with y at the ground or ocean floor there
+   * @param x         block x of the structure's center
+   * @param z         block z of the structure's center
    * @param direction compass direction from the search origin to the structure
    */
-  public record Result(String type, Location location, String direction) {}
+  public record Result(String type, int x, int z, String direction) {}
 
   private final Logger logger;
   private final List<String> structureNames;
@@ -51,7 +51,7 @@ public class StructureFinder {
 
   /**
    * Finds the nearest allowed structure to {@code origin} within the search radius (horizontal
-   * distance). Must be called on the main thread; generates the chunk at the structure it returns.
+   * distance). Must be called on the main thread.
    *
    * @return the nearest structure, or {@code null} if none of the allowed structures are within range
    */
@@ -79,16 +79,15 @@ public class StructureFinder {
     }
     if (nearest == null) return null;
 
-    nearest.setY(world.getHighestBlockYAt(nearest.getBlockX(), nearest.getBlockZ(), HeightMap.OCEAN_FLOOR));
-    return new Result(nearestType, nearest, direction(origin.getX(), origin.getZ(), nearest.getX(), nearest.getZ()));
+    return new Result(nearestType, nearest.getBlockX(), nearest.getBlockZ(),
+        direction(origin.getX(), origin.getZ(), nearest.getX(), nearest.getZ()));
   }
 
   /**
    * {@code locateNearestStructure} only reports the structure's starting chunk. Look up the
-   * structure in that chunk to get the center of its bounding box, falling back to the chunk.
-   *
-   * <p>Only x/z are used: some structures (shipwrecks, desert pyramids, swamp huts, ...) keep a
-   * placeholder y in their bounding box even after they have been placed.
+   * structure in that chunk to get the x/z center of its bounding box, falling back to the chunk.
+   * The box's y is not used: some structures (shipwrecks, desert pyramids, ...) keep a placeholder
+   * height in it even after they have been placed.
    */
   private static Location structureCenter(World world, Structure structure, Location chunkLocation) {
     int chunkX = chunkLocation.getBlockX() >> 4;

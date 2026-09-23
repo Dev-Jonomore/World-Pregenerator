@@ -27,7 +27,7 @@ class ManhuntYamlTest {
         12345L,
         List.of(
             new ManhuntYaml.SpawnPoint(100, 64, 200,
-                new ManhuntYaml.NearestStructure("minecraft:village_plains", 300, 0, -80, "NORTHEAST")),
+                new ManhuntYaml.NearestStructure("minecraft:village_plains", 300, -80, "NORTHEAST")),
             new ManhuntYaml.SpawnPoint(-50, 70, 30, null)
         ),
         1200,
@@ -75,6 +75,7 @@ class ManhuntYamlTest {
     assertTrue(yaml.contains("nearest-structure:\n"), yaml);
     assertTrue(yaml.contains("type: minecraft:village_plains\n"), yaml);
     assertTrue(yaml.contains("direction: NORTHEAST\n"), yaml);
+    assertFalse(yaml.contains("    y:"), "nearest-structure should have no y: " + yaml);
     assertTrue(yaml.contains("pregen-radius: 1200\n"), yaml);
     assertTrue(yaml.contains("overworld: world_0\n"), yaml);
   }

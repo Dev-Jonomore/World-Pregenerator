@@ -87,7 +87,23 @@ public class GenerationTask {
     }
   }
 
+  /**
+   * @return true once every seed in this task has been processed
+   */
+  public boolean isFinished() {
+    return state.getCurrentIndex() >= seeds.size();
+  }
+
+  public boolean isTestMode() {
+    return testMode;
+  }
+
   public void start() {
+    if (isFinished()) {
+      logger.warning("Generation task has already processed all of its seeds.");
+      plugin.running = false;
+      return;
+    }
     interrupted = false;
     if (state.getStartTime() == 0) {
       state.setStartTime(System.currentTimeMillis());
@@ -499,13 +515,9 @@ public class GenerationTask {
       StructureFinder.Result structure = structureFinder.findNearest(world, origin);
       ManhuntYaml.NearestStructure nearest = null;
       if (structure != null) {
-        Location loc = structure.location();
         logger.info("Nearest structure to spawn point " + point.x() + ", " + point.y() + ", " + point.z() + ": "
-            + structure.type() + " at " + loc.getBlockX() + ", " + loc.getBlockY() + ", " + loc.getBlockZ()
-            + " (" + structure.direction() + ")");
-        nearest = new ManhuntYaml.NearestStructure(
-            structure.type(), loc.getBlockX(), loc.getBlockY(), loc.getBlockZ(), structure.direction()
-        );
+            + structure.type() + " at " + structure.x() + ", " + structure.z() + " (" + structure.direction() + ")");
+        nearest = new ManhuntYaml.NearestStructure(structure.type(), structure.x(), structure.z(), structure.direction());
       } else {
         logger.warning("No matching structure within " + config.getStructureFinderSearchRadius()
             + " blocks of spawn point " + point.x() + ", " + point.y() + ", " + point.z() + " in " + world.getName());

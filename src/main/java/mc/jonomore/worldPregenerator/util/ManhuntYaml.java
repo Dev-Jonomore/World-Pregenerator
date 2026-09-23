@@ -74,13 +74,14 @@ public record ManhuntYaml(
 
   /**
    * @param type      namespaced structure key, e.g. {@code minecraft:village_plains}
+   * @param x         block x of the structure's center
+   * @param z         block z of the structure's center
    * @param direction compass direction from the spawn point to the structure, e.g. {@code NORTHEAST}
    */
   @ConfigSerializable
   public record NearestStructure(
       @Setting("type") String type,
       @Setting("x") int x,
-      @Setting("y") int y,
       @Setting("z") int z,
       @Setting("direction") String direction
   ) {}
