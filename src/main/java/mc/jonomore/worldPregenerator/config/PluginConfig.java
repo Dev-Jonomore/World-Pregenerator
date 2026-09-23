@@ -25,12 +25,6 @@ public class PluginConfig {
   @Setting("seeds-file")
   public String seedsFile = "/mnt/seeds/seeds.txt";
 
-  @Setting("spawn-adjustment")
-  public SpawnAdjustment spawnAdjustment = new SpawnAdjustment();
-
-  @Setting("cage-building")
-  public CageBuilding cageBuilding = new CageBuilding();
-
   @Setting("batch-settings")
   public BatchSettings batchSettings = new BatchSettings();
 
@@ -39,27 +33,6 @@ public class PluginConfig {
 
   @Setting("world-delay-ticks")
   public long worldDelayTicks = 40L;
-
-  @ConfigSerializable
-  public static class SpawnAdjustment {
-    @Setting("maxSearchRadius")
-    public int maxSearchRadius = 100;
-
-    @Setting("maxVerticalScan")
-    public int maxVerticalScan = 128;
-  }
-
-  @ConfigSerializable
-  public static class CageBuilding {
-    @Setting("cage-material")
-    public String cageMaterial = "PURPLE_STAINED_GLASS";
-
-    @Setting("cage-radius")
-    public int cageRadius = 4;
-
-    @Setting("cage-height")
-    public int cageHeight = 3;
-  }
 
   @ConfigSerializable
   public static class BatchSettings {
@@ -76,7 +49,7 @@ public class PluginConfig {
     public boolean whitelist = true;
 
     @Setting("search-radius")
-    public int searchRadius = 1200;
+    public int searchRadius = 200;
 
     @Setting("structures")
     public List<String> structures = new ArrayList<>(List.of(

@@ -1,7 +1,6 @@
 package mc.jonomore.worldPregenerator.config;
 
 import mc.jonomore.worldPregenerator.WorldPregenerator;
-import org.bukkit.Material;
 import org.spongepowered.configurate.CommentedConfigurationNode;
 import org.spongepowered.configurate.yaml.NodeStyle;
 import org.spongepowered.configurate.yaml.YamlConfigurationLoader;
@@ -20,11 +19,6 @@ public class ConfigManager {
   private String exportPath;
   private String serverId;
   private String seedsFile;
-  private int maxSearchRadius;
-  private int maxVerticalScan;
-  private Material cageMaterial;
-  private int cageRadius;
-  private int cageHeight;
   private long worldDelayTicks;
   private int worldsPerBatch;
   private long pauseBetweenBatches;
@@ -72,39 +66,6 @@ public class ConfigManager {
     File sFile = new File(seedsFile);
     if (!sFile.exists()) {
         plugin.getLogger().warning("seeds-file does not exist: " + seedsFile);
-    }
-
-    maxSearchRadius = cfg.spawnAdjustment.maxSearchRadius;
-    if (maxSearchRadius < 10 || maxSearchRadius > 256) {
-        plugin.getLogger().warning("maxSearchRadius out of range [10,256]: " + maxSearchRadius + ". Defaulting to 100.");
-        maxSearchRadius = 100;
-    }
-
-    maxVerticalScan = cfg.spawnAdjustment.maxVerticalScan;
-    if (maxVerticalScan < 10 || maxVerticalScan > 256) {
-        plugin.getLogger().warning("maxVerticalScan out of range [10,256]: " + maxVerticalScan + ". Defaulting to 128.");
-        maxVerticalScan = 128;
-    }
-
-    String cageMaterialName = cfg.cageBuilding.cageMaterial;
-    Material parsedMaterial = Material.getMaterial(cageMaterialName);
-    if (parsedMaterial == null) {
-      plugin.getLogger().warning("Invalid cage material: '" + cageMaterialName + "'. Defaulting to 'PURPLE_STAINED_GLASS'");
-      cageMaterial = Material.PURPLE_STAINED_GLASS;
-    } else {
-      cageMaterial = parsedMaterial;
-    }
-
-    cageRadius = cfg.cageBuilding.cageRadius;
-    if (cageRadius < 2 || cageRadius > 10) {
-        plugin.getLogger().warning("cage-radius out of range [2,10]: " + cageRadius + ". Defaulting to 4.");
-        cageRadius = 4;
-    }
-
-    cageHeight = cfg.cageBuilding.cageHeight;
-    if (cageHeight < 3 || cageHeight > 9 || cageHeight % 2 == 0) {
-        plugin.getLogger().warning("cage-height must be an odd number between 3-9: " + cageHeight + ". Defaulting to 3.");
-        cageHeight = 3;
     }
     
     worldDelayTicks = cfg.worldDelayTicks;
@@ -163,16 +124,6 @@ public class ConfigManager {
     return seedsFile;
   }
 
-  public int getMaxSearchRadius() { return maxSearchRadius; }
-
-  public int getMaxVerticalScan() { return maxVerticalScan; }
-
-  public Material getCageMaterial() { return cageMaterial; }
-
-  public int getCageRadius() { return cageRadius; }
-
-  public int getCageHeight() { return cageHeight; }
-
   public long getWorldDelayTicks() { return worldDelayTicks; }
 
   public int getWorldsPerBatch() { return worldsPerBatch; }
@@ -191,13 +142,6 @@ public class ConfigManager {
         "server-id: " + serverId + "\n" +
         "export-path: " + exportPath + "\n" +
         "seeds-file: " + seedsFile + "\n" +
-        "spawn-adjustment:\n" +
-        "  maxSearchRadius: " + maxSearchRadius + "\n" +
-        "  maxVerticalScan: " + maxVerticalScan + "\n" +
-        "cage-building:\n" +
-        "  cage-material: " + cageMaterial + "\n" +
-        "  cage-radius: " + cageRadius + "\n" +
-        "  cage-height: " + cageHeight + "\n" +
         "batch-settings:\n" +
         "  worlds-per-batch: " + worldsPerBatch + "\n" +
         "  pause-between-batches: " + pauseBetweenBatches + "\n" +

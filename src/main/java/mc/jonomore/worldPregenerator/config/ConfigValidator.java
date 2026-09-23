@@ -8,6 +8,7 @@ import java.io.File;
 import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Stream;
 
 public class ConfigValidator {
     private final ConfigManager config;
@@ -22,7 +23,6 @@ public class ConfigValidator {
         // 1. Config validation (already partially done in ConfigManager, but we can report it here)
         results.add("<gray>Checking configuration values...");
         results.add("<green> - generation-radius: " + config.getGenerationRadius());
-        results.add("<green> - cage-radius: " + config.getCageRadius());
         results.add("<green> - worlds-per-batch: " + config.getWorldsPerBatch());
 
         // 2. Seed file check
@@ -33,11 +33,11 @@ public class ConfigValidator {
         } else if (!seedFile.canRead()) {
             results.add("<red> - FAILED: Seed file is not readable.");
         } else {
-            try {
-                long count = Files.lines(seedFile.toPath()).count();
+            try (Stream<String> lines = Files.lines(seedFile.toPath())) {
+                long count = lines.count();
                 results.add("<green> - SUCCESS: Found " + count + " seeds.");
                 
-                // 5. Estimate disk space (radius × seeds × ~50MB)
+                // 3. Estimate disk space (radius × seeds × ~50MB)
                 // Assuming 50MB is for a standard radius (e.g. 1000). 
                 // Let's scale it slightly based on radius squared.
                 double scale = Math.pow(config.getGenerationRadius() / 1000.0, 2);

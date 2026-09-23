@@ -3,8 +3,6 @@ package mc.jonomore.worldPregenerator.generation;
 import mc.jonomore.worldPregenerator.GenerationConstants;
 import mc.jonomore.worldPregenerator.WorldPregenerator;
 import mc.jonomore.worldPregenerator.config.ConfigManager;
-import mc.jonomore.worldPregenerator.logic.CageBuilder;
-import mc.jonomore.worldPregenerator.logic.SpawnAdjuster;
 import mc.jonomore.worldPregenerator.logic.StructureFinder;
 import mc.jonomore.worldPregenerator.util.FileUtils;
 import mc.jonomore.worldPregenerator.util.ManhuntYaml;
@@ -44,8 +42,6 @@ public class GenerationTask {
   private final List<SeedEntry> seeds;
   private final Set<Long> completedSeeds;
   private final ChunkyAPI chunky;
-  private final SpawnAdjuster spawnAdjuster;
-  private final CageBuilder cageBuilder;
   private final StructureFinder structureFinder;
   private final ErrorHandler errorHandler;
   private final GenerationState state;
@@ -76,8 +72,6 @@ public class GenerationTask {
     completedSeedsFile = new File(plugin.getDataFolder(), GenerationConstants.COMPLETED_SEEDS_FILE_NAME);
     this.chunky = chunky;
     errorHandler = new ErrorHandler(logger);
-    spawnAdjuster = new SpawnAdjuster(config.getMaxSearchRadius(), config.getMaxVerticalScan());
-    cageBuilder = new CageBuilder(config.getCageMaterial(), config.getCageRadius(), config.getCageHeight());
     structureFinder = new StructureFinder(
         logger,
         config.getStructureFinderStructures(),
@@ -272,20 +266,8 @@ public class GenerationTask {
         }
         if (world == null) throw new RuntimeException("World " + worldName + " not loaded for preparation");
 
-        // Spawn Adjustment
-        if (!SpawnAdjuster.isSafeSpawn(world.getSpawnLocation())) {
-          Location safeSpawn = spawnAdjuster.findSafeSpawn(world);
-          if (safeSpawn != null) {
-            world.setSpawnLocation(safeSpawn);
-            logger.info("Spawn adjusted to: " + safeSpawn.getBlockX() + ", " + safeSpawn.getBlockY() + ", " + safeSpawn.getBlockZ());
-          }
-        }
-
         SeedEntry seedEntry = seeds.get(state.getCurrentIndex());
         state.setPendingManhuntYml(buildManhuntYml(world, seedEntry).toYamlString());
-
-        // Cage
-        cageBuilder.buildCage(world);
 
         // Save and Unload
         world.save();
@@ -531,10 +513,8 @@ public class GenerationTask {
       spawnPoints.add(new ManhuntYaml.SpawnPoint(point.x(), point.y(), point.z(), nearest));
     }
 
-    Location spawn = world.getSpawnLocation();
     return new ManhuntYaml(
         seed.seed(),
-        new ManhuntYaml.BlockPos(spawn.getBlockX(), spawn.getBlockY(), spawn.getBlockZ()),
         spawnPoints,
         config.getGenerationRadius(),
         new ManhuntYaml.Worlds(world.getName(), null, null)

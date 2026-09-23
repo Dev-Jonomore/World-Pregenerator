@@ -49,20 +49,12 @@ import java.util.zip.ZipFile;
 @ConfigSerializable
 public record ManhuntYaml(
     @Setting("seed") long seed,
-    @Setting("spawn") BlockPos spawn,
     @Setting("spawn-points") List<SpawnPoint> spawnPoints,
     @Setting("pregen-radius") int pregenRadius,
     @Setting("worlds") Worlds worlds
 ) {
 
   public static final String FILE_NAME = "manhunt.yml";
-
-  @ConfigSerializable
-  public record BlockPos(
-      @Setting("x") int x,
-      @Setting("y") int y,
-      @Setting("z") int z
-  ) {}
 
   /**
    * A spawn point and the nearest structure to it, if one was found within the search radius.

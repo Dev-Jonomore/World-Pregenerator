@@ -1,11 +1,11 @@
 plugins {
     id("java")
-    id("xyz.jpenilla.run-paper") version "2.3.1"
-    id("com.gradleup.shadow") version "9.3.1"
+    id("xyz.jpenilla.run-paper") version "3.1.0"
+    id("com.gradleup.shadow") version "9.6.1"
 }
 
 group = "mc.jonomore"
-version = "2.1"
+version = "3.0"
 
 repositories {
     mavenCentral()
@@ -20,8 +20,8 @@ repositories {
 }
 
 dependencies {
-    compileOnly("io.papermc.paper:paper-api:26.1.2.build.+")
-    compileOnly(group = "org.popcraft", name = "chunky-common", version = "1.3.38")
+    compileOnly("io.papermc.paper:paper-api:26.3-pre-2.build.0-alpha")
+    compileOnly("org.popcraft:chunky-common:1.5.3")
     implementation("org.spongepowered:configurate-yaml:4.2.0")
 }
 
@@ -34,7 +34,7 @@ tasks {
         // Configure the Minecraft version for our task.
         // This is the only required configuration besides applying the plugin.
         // Your plugin's jar (or shadowJar if present) will be used automatically.
-        minecraftVersion("26.1")
+        minecraftVersion("26.3")
     }
 
     compileJava {
