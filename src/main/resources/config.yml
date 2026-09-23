@@ -1,4 +1,9 @@
 generation-radius: 1200
+# What to pregenerate: world-spawn (a square of generation-radius around the world spawn) or
+# spawn-points (the smallest rectangle containing the seed's spawn points, plus spawn-points-margin)
+generation-area: world-spawn
+# Blocks added on each side in spawn-points mode; covers the respawn radius and snap radius
+spawn-points-margin: 128
 server-id: "server1"
 export-path: "/mnt/worlds"
 seeds-file: "/mnt/seeds/seeds.txt"
@@ -28,4 +33,15 @@ structure-finder:
     - ruined_portal_mountain
     - ruined_portal_ocean
     - ruined_portal_swamp
+spawn-verification:
+  # Checks each spawn point the way vanilla places respawning players (a random dry column within
+  # respawn-radius of the spawn) and moves points where too few columns qualify, e.g. in the ocean.
+  enabled: true
+  # Must match the live servers' respawn_radius game rule (vanilla default 10). Range: 0-15
+  respawn-radius: 10
+  # Share of the (2r+1)^2 columns around a point that must be valid landing spots. Range: (0, 1]
+  min-valid-fraction: 0.25
+  # How far a failing point may be moved to find a valid spot, in blocks. Points that can't be
+  # fixed are dropped. 80 matches vanilla's own 5-chunk search when it picks the world spawn.
+  snap-radius: 80
 world-delay-ticks: 40

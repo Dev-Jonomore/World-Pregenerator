@@ -57,20 +57,44 @@ public record ManhuntYaml(
   public static final String FILE_NAME = "manhunt.yml";
 
   /**
-   * A spawn point and the nearest structure to it, if one was found within the search radius.
+   * A spawn point, the nearest structure to it if one was found within the search radius, and how
+   * spawn verification changed it (null if it was left as-is).
    */
   @ConfigSerializable
   public record SpawnPoint(
       @Setting("x") int x,
       @Setting("y") int y,
       @Setting("z") int z,
-      @Setting("nearest-structure") @Nullable NearestStructure nearestStructure
+      @Setting("nearest-structure") @Nullable NearestStructure nearestStructure,
+      @Setting("verification") @Nullable Verification verification
   ) {
     public SpawnPoint {
       // Configurate maps a missing section to an empty object rather than null
       if (nearestStructure != null && nearestStructure.type() == null) nearestStructure = null;
+      if (verification != null && verification.status() == null) verification = null;
+    }
+
+    public SpawnPoint(int x, int y, int z, @Nullable NearestStructure nearestStructure) {
+      this(x, y, z, nearestStructure, null);
     }
   }
+
+  /**
+   * @param status   what spawn verification did, e.g. {@code ADJUSTED}
+   * @param original the point as given in the seeds file
+   */
+  @ConfigSerializable
+  public record Verification(
+      @Setting("status") String status,
+      @Setting("original") Position original
+  ) {}
+
+  @ConfigSerializable
+  public record Position(
+      @Setting("x") int x,
+      @Setting("y") int y,
+      @Setting("z") int z
+  ) {}
 
   /**
    * @param type      namespaced structure key, e.g. {@code minecraft:village_plains}

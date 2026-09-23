@@ -81,6 +81,26 @@ class ManhuntYamlTest {
   }
 
   @Test
+  void roundTripsVerification() throws IOException {
+    ManhuntYaml adjusted = new ManhuntYaml(
+        1L,
+        List.of(
+            new ManhuntYaml.SpawnPoint(25, 65, 0, null,
+                new ManhuntYaml.Verification("ADJUSTED", new ManhuntYaml.Position(0, 62, 0))),
+            new ManhuntYaml.SpawnPoint(100, 70, 100, null)
+        ),
+        1200,
+        new ManhuntYaml.Worlds("world_0", null, null)
+    );
+    String yaml = adjusted.toYamlString();
+    Path zip = zipWith(tempDir, yaml);
+
+    assertTrue(yaml.contains("status: ADJUSTED\n"), yaml);
+    assertEquals(adjusted, ManhuntYaml.fromZip(zip));
+    assertNull(ManhuntYaml.fromZip(zip).spawnPoints().get(1).verification());
+  }
+
+  @Test
   void omitsNullSections() throws IOException {
     ManhuntYaml noStructures = new ManhuntYaml(
         1L,
@@ -91,6 +111,7 @@ class ManhuntYamlTest {
     String yaml = noStructures.toYamlString();
 
     assertFalse(yaml.contains("nearest-structure"), yaml);
+    assertFalse(yaml.contains("verification"), yaml);
     assertFalse(yaml.contains("nether"), yaml);
     assertFalse(yaml.contains("end:"), yaml);
   }

@@ -45,6 +45,8 @@ class PluginConfigTest {
     PluginConfig defaults = new PluginConfig();
 
     assertEquals(defaults.generationRadius, bundled.generationRadius);
+    assertEquals(defaults.generationArea, bundled.generationArea);
+    assertEquals(defaults.spawnPointsMargin, bundled.spawnPointsMargin);
     assertEquals(defaults.serverId, bundled.serverId);
     assertEquals(defaults.exportPath, bundled.exportPath);
     assertEquals(defaults.seedsFile, bundled.seedsFile);
@@ -54,6 +56,10 @@ class PluginConfigTest {
     assertEquals(defaults.structureFinder.whitelist, bundled.structureFinder.whitelist);
     assertEquals(defaults.structureFinder.searchRadius, bundled.structureFinder.searchRadius);
     assertEquals(defaults.structureFinder.structures, bundled.structureFinder.structures);
+    assertEquals(defaults.spawnVerification.enabled, bundled.spawnVerification.enabled);
+    assertEquals(defaults.spawnVerification.respawnRadius, bundled.spawnVerification.respawnRadius);
+    assertEquals(defaults.spawnVerification.minValidFraction, bundled.spawnVerification.minValidFraction);
+    assertEquals(defaults.spawnVerification.snapRadius, bundled.spawnVerification.snapRadius);
   }
 
   @Test

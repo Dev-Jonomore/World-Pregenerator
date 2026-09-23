@@ -16,6 +16,12 @@ public class PluginConfig {
   @Setting("generation-radius")
   public int generationRadius = 1200;
 
+  @Setting("generation-area")
+  public String generationArea = "world-spawn";
+
+  @Setting("spawn-points-margin")
+  public int spawnPointsMargin = 128;
+
   @Setting("server-id")
   public String serverId = "server1";
 
@@ -31,6 +37,9 @@ public class PluginConfig {
   @Setting("structure-finder")
   public StructureFinder structureFinder = new StructureFinder();
 
+  @Setting("spawn-verification")
+  public SpawnVerification spawnVerification = new SpawnVerification();
+
   @Setting("world-delay-ticks")
   public long worldDelayTicks = 40L;
 
@@ -41,6 +50,21 @@ public class PluginConfig {
 
     @Setting("pause-between-batches")
     public long pauseBetweenBatches = 60L;
+  }
+
+  @ConfigSerializable
+  public static class SpawnVerification {
+    @Setting("enabled")
+    public boolean enabled = true;
+
+    @Setting("respawn-radius")
+    public int respawnRadius = 10;
+
+    @Setting("min-valid-fraction")
+    public double minValidFraction = 0.25;
+
+    @Setting("snap-radius")
+    public int snapRadius = 80;
   }
 
   @ConfigSerializable

@@ -11,11 +11,16 @@ import java.util.List;
 import java.util.logging.Level;
 
 public class ConfigManager {
+  /** What Chunky pregenerates: a square around the world spawn, or a rectangle around the seed's spawn points. */
+  public enum GenerationAreaMode { WORLD_SPAWN, SPAWN_POINTS }
+
   private final WorldPregenerator plugin;
   private final YamlConfigurationLoader loader;
 
   // Cached config values
   private int generationRadius;
+  private GenerationAreaMode generationArea;
+  private int spawnPointsMargin;
   private String exportPath;
   private String serverId;
   private String seedsFile;
@@ -25,6 +30,10 @@ public class ConfigManager {
   private List<String> structureFinderStructures;
   private boolean structureFinderWhitelist;
   private int structureFinderSearchRadius;
+  private boolean spawnVerificationEnabled;
+  private int respawnRadius;
+  private double minValidFraction;
+  private int snapRadius;
 
   public ConfigManager(WorldPregenerator plugin) {
     this.plugin = plugin;
@@ -53,6 +62,18 @@ public class ConfigManager {
     if (generationRadius < 100 || generationRadius > 10000) {
         plugin.getLogger().warning("generation-radius out of range [100,10000]: " + generationRadius + ". Defaulting to 1200.");
         generationRadius = 1200;
+    }
+
+    try {
+        generationArea = GenerationAreaMode.valueOf(cfg.generationArea.trim().toUpperCase().replace('-', '_'));
+    } catch (IllegalArgumentException | NullPointerException e) {
+        plugin.getLogger().warning("generation-area must be world-spawn or spawn-points: " + cfg.generationArea + ". Defaulting to world-spawn.");
+        generationArea = GenerationAreaMode.WORLD_SPAWN;
+    }
+    spawnPointsMargin = cfg.spawnPointsMargin;
+    if (spawnPointsMargin < 16 || spawnPointsMargin > 2000) {
+        plugin.getLogger().warning("spawn-points-margin out of range [16,2000]: " + spawnPointsMargin + ". Defaulting to 128.");
+        spawnPointsMargin = 128;
     }
 
     exportPath = cfg.exportPath;
@@ -90,8 +111,26 @@ public class ConfigManager {
     structureFinderWhitelist = cfg.structureFinder.whitelist;
     structureFinderSearchRadius = cfg.structureFinder.searchRadius;
     if (structureFinderSearchRadius < 16 || structureFinderSearchRadius > 10000) {
-        plugin.getLogger().warning("structure-finder.search-radius out of range [16,10000]: " + structureFinderSearchRadius + ". Defaulting to 1200.");
-        structureFinderSearchRadius = 1200;
+        plugin.getLogger().warning("structure-finder.search-radius out of range [16,10000]: " + structureFinderSearchRadius + ". Defaulting to 200.");
+        structureFinderSearchRadius = 200;
+    }
+
+    spawnVerificationEnabled = cfg.spawnVerification.enabled;
+    respawnRadius = cfg.spawnVerification.respawnRadius;
+    // Vanilla tries at most 1024 columns, which covers the whole square only up to radius 15
+    if (respawnRadius < 0 || respawnRadius > 15) {
+        plugin.getLogger().warning("spawn-verification.respawn-radius out of range [0,15]: " + respawnRadius + ". Defaulting to 10.");
+        respawnRadius = 10;
+    }
+    minValidFraction = cfg.spawnVerification.minValidFraction;
+    if (!(minValidFraction > 0 && minValidFraction <= 1)) {
+        plugin.getLogger().warning("spawn-verification.min-valid-fraction out of range (0,1]: " + minValidFraction + ". Defaulting to 0.25.");
+        minValidFraction = 0.25;
+    }
+    snapRadius = cfg.spawnVerification.snapRadius;
+    if (snapRadius < 0 || snapRadius > 256) {
+        plugin.getLogger().warning("spawn-verification.snap-radius out of range [0,256]: " + snapRadius + ". Defaulting to 80.");
+        snapRadius = 80;
     }
   }
 
@@ -111,6 +150,10 @@ public class ConfigManager {
   public int getGenerationRadius() {
     return generationRadius;
   }
+
+  public GenerationAreaMode getGenerationArea() { return generationArea; }
+
+  public int getSpawnPointsMargin() { return spawnPointsMargin; }
 
   public String getExportPath() {
     return exportPath;
@@ -136,9 +179,19 @@ public class ConfigManager {
 
   public int getStructureFinderSearchRadius() { return structureFinderSearchRadius; }
 
+  public boolean isSpawnVerificationEnabled() { return spawnVerificationEnabled; }
+
+  public int getRespawnRadius() { return respawnRadius; }
+
+  public double getMinValidFraction() { return minValidFraction; }
+
+  public int getSnapRadius() { return snapRadius; }
+
   @Override
   public String toString() {
     return "generation-radius: " + generationRadius + "\n" +
+        "generation-area: " + generationArea.name().toLowerCase().replace('_', '-') + "\n" +
+        "spawn-points-margin: " + spawnPointsMargin + "\n" +
         "server-id: " + serverId + "\n" +
         "export-path: " + exportPath + "\n" +
         "seeds-file: " + seedsFile + "\n" +
@@ -149,6 +202,11 @@ public class ConfigManager {
         "  whitelist: " + structureFinderWhitelist + "\n" +
         "  search-radius: " + structureFinderSearchRadius + "\n" +
         "  structures: " + structureFinderStructures + "\n" +
+        "spawn-verification:\n" +
+        "  enabled: " + spawnVerificationEnabled + "\n" +
+        "  respawn-radius: " + respawnRadius + "\n" +
+        "  min-valid-fraction: " + minValidFraction + "\n" +
+        "  snap-radius: " + snapRadius + "\n" +
         "world-delay-ticks: " + worldDelayTicks;
   }
 }

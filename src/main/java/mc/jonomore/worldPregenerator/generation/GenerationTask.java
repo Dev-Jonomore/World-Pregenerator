@@ -3,6 +3,8 @@ package mc.jonomore.worldPregenerator.generation;
 import mc.jonomore.worldPregenerator.GenerationConstants;
 import mc.jonomore.worldPregenerator.WorldPregenerator;
 import mc.jonomore.worldPregenerator.config.ConfigManager;
+import mc.jonomore.worldPregenerator.logic.BukkitBlockView;
+import mc.jonomore.worldPregenerator.logic.SpawnVerifier;
 import mc.jonomore.worldPregenerator.logic.StructureFinder;
 import mc.jonomore.worldPregenerator.util.FileUtils;
 import mc.jonomore.worldPregenerator.util.ManhuntYaml;
@@ -43,6 +45,7 @@ public class GenerationTask {
   private final Set<Long> completedSeeds;
   private final ChunkyAPI chunky;
   private final StructureFinder structureFinder;
+  private final SpawnVerifier spawnVerifier;
   private final ErrorHandler errorHandler;
   private final GenerationState state;
   private final File stateFile;
@@ -72,6 +75,9 @@ public class GenerationTask {
     completedSeedsFile = new File(plugin.getDataFolder(), GenerationConstants.COMPLETED_SEEDS_FILE_NAME);
     this.chunky = chunky;
     errorHandler = new ErrorHandler(logger);
+    spawnVerifier = config.isSpawnVerificationEnabled()
+        ? new SpawnVerifier(config.getRespawnRadius(), config.getMinValidFraction(), config.getSnapRadius())
+        : null;
     structureFinder = new StructureFinder(
         logger,
         config.getStructureFinderStructures(),
@@ -254,13 +260,16 @@ public class GenerationTask {
       }
 
       if (!chunky.isRunning(targetWorld)) {
+        GenerationArea area = generationArea(world, seeds.get(state.getCurrentIndex()));
+        logger.info("Pregenerating a " + area.shape() + " around " + (int) area.centerX() + ", " + (int) area.centerZ()
+            + " (radius " + (int) area.radiusX() + " x " + (int) area.radiusZ() + ")");
         chunky.startTask(
             targetWorld,
-            "square",
-            world.getSpawnLocation().getX(),
-            world.getSpawnLocation().getZ(),
-            config.getGenerationRadius(),
-            config.getGenerationRadius(),
+            area.shape(),
+            area.centerX(),
+            area.centerZ(),
+            area.radiusX(),
+            area.radiusZ(),
             "concentric"
         );
       }
@@ -414,12 +423,18 @@ public class GenerationTask {
 
   private void handleCleanup() {
     logger.info("Step: CLEANUP for " + state.getCurrentWorldName());
-    Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
-      Path dimensionFolder = state.getCurrentWorldFolder().toPath();
-      FileUtils.deleteDirectoryWithRetry(dimensionFolder, logger, success -> Bukkit.getScheduler().runTask(plugin, () -> {
-        if (success) advance(Step.COMPLETE);
-        else handleError(new RuntimeException("Failed to delete dimension folder: " + dimensionFolder));
-      }));
+    Bukkit.getScheduler().runTask(plugin, () -> {
+      // A seed skipped mid-way (e.g. during PREPARE_WORLD) can leave its world loaded
+      World world = state.getCurrentWorldName() != null ? Bukkit.getWorld(state.getCurrentWorldName()) : null;
+      if (world != null) Bukkit.unloadWorld(world, false);
+
+      Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
+        Path dimensionFolder = state.getCurrentWorldFolder().toPath();
+        FileUtils.deleteDirectoryWithRetry(dimensionFolder, logger, success -> Bukkit.getScheduler().runTask(plugin, () -> {
+          if (success) advance(Step.COMPLETE);
+          else handleError(new RuntimeException("Failed to delete dimension folder: " + dimensionFolder));
+        }));
+      });
     });
   }
 
@@ -510,9 +525,41 @@ public class GenerationTask {
     }
   }
 
+  private GenerationArea generationArea(World world, SeedEntry seed) {
+    if (config.getGenerationArea() == ConfigManager.GenerationAreaMode.SPAWN_POINTS && !seed.spawnPoints().isEmpty()) {
+      return GenerationArea.aroundSpawnPoints(seed.spawnPoints(), config.getSpawnPointsMargin());
+    }
+    Location spawn = world.getSpawnLocation();
+    return GenerationArea.aroundWorldSpawn(spawn.getX(), spawn.getZ(), config.getGenerationRadius());
+  }
+
   private ManhuntYaml buildManhuntYml(World world, SeedEntry seed) {
     List<ManhuntYaml.SpawnPoint> spawnPoints = new ArrayList<>();
-    for (SpawnPoint point : seed.spawnPoints()) {
+    BukkitBlockView view = new BukkitBlockView(world);
+    for (SpawnPoint given : seed.spawnPoints()) {
+      SpawnPoint point = given;
+      ManhuntYaml.Verification verification = null;
+      if (spawnVerifier != null) {
+        SpawnVerifier.Result result = spawnVerifier.verify(view, given);
+        String where = given.x() + ", " + given.y() + ", " + given.z();
+        switch (result.status()) {
+          case OK -> logger.info("Spawn point " + where + " OK ("
+              + result.validColumns() + "/" + result.totalColumns() + " valid landing columns)");
+          case ADJUSTED -> {
+            point = result.point();
+            logger.info("Spawn point " + where + " moved to " + point.x() + ", " + point.y() + ", " + point.z() + " ("
+                + result.validColumns() + "/" + result.totalColumns() + " valid landing columns)");
+            verification = new ManhuntYaml.Verification(result.status().name(),
+                new ManhuntYaml.Position(given.x(), given.y(), given.z()));
+          }
+          case FAILED -> {
+            logger.warning("Spawn point " + where + " dropped: only " + result.validColumns() + "/" + result.totalColumns()
+                + " valid landing columns and no valid spot within " + config.getSnapRadius() + " blocks");
+            continue;
+          }
+        }
+      }
+
       Location origin = new Location(world, point.x(), point.y(), point.z());
       StructureFinder.Result structure = structureFinder.findNearest(world, origin);
       ManhuntYaml.NearestStructure nearest = null;
@@ -524,7 +571,11 @@ public class GenerationTask {
         logger.warning("No matching structure within " + config.getStructureFinderSearchRadius()
             + " blocks of spawn point " + point.x() + ", " + point.y() + ", " + point.z() + " in " + world.getName());
       }
-      spawnPoints.add(new ManhuntYaml.SpawnPoint(point.x(), point.y(), point.z(), nearest));
+      spawnPoints.add(new ManhuntYaml.SpawnPoint(point.x(), point.y(), point.z(), nearest, verification));
+    }
+    if (spawnPoints.isEmpty()) {
+      // Not IllegalStateException: ErrorHandler treats that as fatal, but this only skips the seed
+      throw new IllegalArgumentException("No valid spawn points for seed " + seed.seed());
     }
 
     return new ManhuntYaml(
