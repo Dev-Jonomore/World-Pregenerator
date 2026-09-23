@@ -218,6 +218,8 @@ public class GenerationTask {
   }
 
   private void handleGenerateChunks() {
+    // Chunky identifies worlds by name (it calls Bukkit's Server#getWorld(String)), not by
+    // namespaced key; passing a key like "minecraft:world_0" silently starts no task
     final String targetWorld = state.getCurrentWorldName();
     if (targetWorld == null) {
       state.setCurrentStep(Step.CREATE_WORLD.name());
