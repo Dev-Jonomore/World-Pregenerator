@@ -2,11 +2,14 @@ package mc.jonomore.worldPregenerator.logic;
 
 import io.papermc.paper.registry.RegistryAccess;
 import io.papermc.paper.registry.RegistryKey;
+import org.bukkit.HeightMap;
 import org.bukkit.Location;
 import org.bukkit.NamespacedKey;
 import org.bukkit.Registry;
 import org.bukkit.World;
+import org.bukkit.generator.structure.GeneratedStructure;
 import org.bukkit.generator.structure.Structure;
+import org.bukkit.util.BoundingBox;
 import org.bukkit.util.StructureSearchResult;
 
 import java.util.HashSet;
@@ -26,7 +29,7 @@ public class StructureFinder {
    * A located structure.
    *
    * @param type      namespaced key of the structure, e.g. {@code minecraft:village_plains}
-   * @param location  where the structure was found
+   * @param location  center of the structure in x/z, with y at the ground or ocean floor there
    * @param direction compass direction from the search origin to the structure
    */
   public record Result(String type, Location location, String direction) {}
@@ -34,6 +37,7 @@ public class StructureFinder {
   private final Logger logger;
   private final List<String> structureNames;
   private final boolean whitelist;
+  private final int searchRadiusBlocks;
   private final int searchRadiusChunks;
   private Map<NamespacedKey, Structure> candidates = null;
 
@@ -41,33 +45,59 @@ public class StructureFinder {
     this.logger = logger;
     this.structureNames = List.copyOf(structureNames);
     this.whitelist = whitelist;
+    this.searchRadiusBlocks = searchRadiusBlocks;
     this.searchRadiusChunks = Math.ceilDiv(searchRadiusBlocks, 16);
   }
 
   /**
-   * Finds the nearest allowed structure to {@code origin}. Must be called on the main thread.
+   * Finds the nearest allowed structure to {@code origin} within the search radius (horizontal
+   * distance). Must be called on the main thread; generates the chunk at the structure it returns.
    *
    * @return the nearest structure, or {@code null} if none of the allowed structures are within range
    */
   public Result findNearest(World world, Location origin) {
-    Result nearest = null;
-    double nearestDistance = Double.MAX_VALUE;
+    String nearestType = null;
+    Location nearest = null;
+    double nearestDistanceSq = (double) searchRadiusBlocks * searchRadiusBlocks;
 
     for (Map.Entry<NamespacedKey, Structure> candidate : getCandidates().entrySet()) {
       Structure structure = candidate.getValue();
+      // The radius only roughly bounds the search (for spread-out structures vanilla counts it in
+      // placement regions, not chunks), so results can lie far outside it; they are filtered below
       StructureSearchResult result = world.locateNearestStructure(origin, structure, searchRadiusChunks, false);
       if (result == null) continue;
 
-      Location location = result.getLocation();
+      Location location = structureCenter(world, structure, result.getLocation());
       double dx = location.getX() - origin.getX();
       double dz = location.getZ() - origin.getZ();
-      double distance = dx * dx + dz * dz;
-      if (distance < nearestDistance) {
-        nearestDistance = distance;
-        nearest = new Result(candidate.getKey().toString(), location, direction(origin.getX(), origin.getZ(), location.getX(), location.getZ()));
+      double distanceSq = dx * dx + dz * dz;
+      if (distanceSq <= nearestDistanceSq) {
+        nearestDistanceSq = distanceSq;
+        nearestType = candidate.getKey().toString();
+        nearest = location;
       }
     }
-    return nearest;
+    if (nearest == null) return null;
+
+    nearest.setY(world.getHighestBlockYAt(nearest.getBlockX(), nearest.getBlockZ(), HeightMap.OCEAN_FLOOR));
+    return new Result(nearestType, nearest, direction(origin.getX(), origin.getZ(), nearest.getX(), nearest.getZ()));
+  }
+
+  /**
+   * {@code locateNearestStructure} only reports the structure's starting chunk. Look up the
+   * structure in that chunk to get the center of its bounding box, falling back to the chunk.
+   *
+   * <p>Only x/z are used: some structures (shipwrecks, desert pyramids, swamp huts, ...) keep a
+   * placeholder y in their bounding box even after they have been placed.
+   */
+  private static Location structureCenter(World world, Structure structure, Location chunkLocation) {
+    int chunkX = chunkLocation.getBlockX() >> 4;
+    int chunkZ = chunkLocation.getBlockZ() >> 4;
+    for (GeneratedStructure generated : world.getStructures(chunkX, chunkZ, structure)) {
+      BoundingBox box = generated.getBoundingBox();
+      return new Location(world, box.getCenterX(), 0, box.getCenterZ());
+    }
+    return chunkLocation;
   }
 
   /**

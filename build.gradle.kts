@@ -40,6 +40,10 @@ tasks {
         // This is the only required configuration besides applying the plugin.
         // Your plugin's jar (or shadowJar if present) will be used automatically.
         minecraftVersion("26.3")
+        downloadPlugins {
+            // Modrinth version ID of Chunky-Bukkit 1.5.3 (the version number is shared across loaders)
+            modrinth("chunky", "MdY6JATr")
+        }
     }
 
     compileJava {

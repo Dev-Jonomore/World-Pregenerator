@@ -37,7 +37,7 @@ Missing keys fall back to their defaults. Note that `/wp config` rewrites the fi
     *   `cage-material`: The material to use for the protective cage. (Default: `PURPLE_STAINED_GLASS`)
     *   `cage-radius`: The radius of the cage. (Range: 2-10, Default: 4)
     *   `cage-height`: The height of the cage. Must be an odd number. (Range: 3-9, Default: 3)
-*   `structure-finder`: After chunk generation, the nearest matching structure to each spawn point is written to that spawn point's entry in `manhunt.yml` under `nearest-structure` (type, x/y/z, and direction from the spawn point).
+*   `structure-finder`: After chunk generation, the nearest matching structure to each spawn point is written to that spawn point's entry in `manhunt.yml` under `nearest-structure` (type, x/y/z, and direction from the spawn point). x/z are the center of the structure; y is the ground or ocean floor there, so it is the surface above underground structures.
     *   `whitelist`: If `true`, only the listed structures are searched for; if `false`, every structure except the listed ones is. (Default: `true`)
     *   `search-radius`: How far from each spawn point to search, in blocks. (Range: 16-10000, Default: 1200)
     *   `structures`: Structure keys such as `village_plains` or `minecraft:desert_pyramid`.
