@@ -37,12 +37,10 @@ public class ConfigValidator {
                 long count = lines.count();
                 results.add("<green> - SUCCESS: Found " + count + " seeds.");
                 
-                // 3. Estimate disk space (radius × seeds × ~50MB)
-                // Assuming 50MB is for a standard radius (e.g. 1000). 
-                // Let's scale it slightly based on radius squared.
-                double scale = Math.pow(config.getGenerationRadius() / 1000.0, 2);
-                long estimatedMB = (long) (count * 50 * scale);
-                results.add("<yellow> - Estimated disk space needed: ~" + estimatedMB + " MB");
+                // 3. Estimate disk space
+                double perWorldGB = estimateWorldSizeGB(config.getGenerationRadius());
+                results.add(String.format("<yellow> - Estimated size per world: ~%.2f GB", perWorldGB));
+                results.add(String.format("<yellow> - Estimated disk space needed: ~%.2f GB", perWorldGB * count));
             } catch (Exception e) {
                 results.add("<red> - FAILED: Could not read seed file: " + e.getMessage());
             }
@@ -70,5 +68,20 @@ public class ConfigValidator {
         }
 
         return results;
+    }
+
+    /**
+     * Average overworld region-file size per generated chunk, in KB (Minecraft 26.1.2),
+     * taken from the world size calculator at https://onlinemo.de/world.
+     */
+    private static final double OVERWORLD_KB_PER_CHUNK = 9.82;
+
+    /**
+     * Estimates the on-disk size of one world pregenerated as a Chunky square of the given radius.
+     * Only the overworld is generated, so the nether and end are not counted.
+     */
+    static double estimateWorldSizeGB(int radius) {
+        double chunksPerSide = radius * 2 / 16.0;
+        return chunksPerSide * chunksPerSide * OVERWORLD_KB_PER_CHUNK / 1024 / 1024;
     }
 }
