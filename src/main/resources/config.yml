@@ -28,4 +28,4 @@ structure-finder:
     - ruined_portal_mountain
     - ruined_portal_ocean
     - ruined_portal_swamp
-world-delay-ticks: 4
+world-delay-ticks: 40

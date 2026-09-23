@@ -23,6 +23,11 @@ dependencies {
     compileOnly("io.papermc.paper:paper-api:26.3-pre-2.build.0-alpha")
     compileOnly("org.popcraft:chunky-common:1.5.3")
     implementation("org.spongepowered:configurate-yaml:4.2.0")
+
+    testImplementation("io.papermc.paper:paper-api:26.3-pre-2.build.0-alpha")
+    testImplementation(platform("org.junit:junit-bom:6.1.3"))
+    testImplementation("org.junit.jupiter:junit-jupiter")
+    testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 
 java {
@@ -40,6 +45,10 @@ tasks {
     compileJava {
         options.encoding = "UTF-8"
         options.release = 25
+    }
+
+    test {
+        useJUnitPlatform()
     }
 
     processResources {

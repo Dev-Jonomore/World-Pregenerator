@@ -5,7 +5,7 @@ import mc.jonomore.worldPregenerator.generation.FailedSeedEntry;
 import mc.jonomore.worldPregenerator.generation.GenerationState;
 import mc.jonomore.worldPregenerator.generation.GenerationTask;
 import mc.jonomore.worldPregenerator.generation.SeedEntry;
-import mc.jonomore.worldPregenerator.generation.SpawnPoint;
+import mc.jonomore.worldPregenerator.generation.SeedParser;
 import mc.jonomore.worldPregenerator.util.FileUtils;
 import io.papermc.paper.plugin.lifecycle.event.types.LifecycleEvents;
 import org.bukkit.Bukkit;
@@ -159,35 +159,15 @@ public final class WorldPregenerator extends JavaPlugin {
   }
 
   private List<SeedEntry> readSeeds() {
-    // Expected format: "seed/x1,y1,z1/x2,y2,z2/..." where each x,y,z group is a spawn point
-    // Example: "12345/100,64,200/-50,70,30/0,80,-120"
-    java.util.regex.Pattern pattern = java.util.regex.Pattern.compile("^(-?\\d+)(?:\\s*/\\s*-?\\d+\\s*,\\s*-?\\d+\\s*,\\s*-?\\d+)+$");
-    java.util.regex.Pattern pointPattern = java.util.regex.Pattern.compile("/\\s*(-?\\d+)\\s*,\\s*(-?\\d+)\\s*,\\s*(-?\\d+)");
     try (java.util.stream.Stream<String> lines = Files.lines(Paths.get(config.getSeedsFile()))) {
-      return lines.map(String::trim)
-        .filter(line -> !line.isEmpty())
+      return lines.filter(line -> !line.isBlank())
         .map(line -> {
-          java.util.regex.Matcher matcher = pattern.matcher(line);
-          if (matcher.matches()) {
-            try {
-              long seed = Long.parseLong(matcher.group(1));
-              List<SpawnPoint> spawnPoints = new java.util.ArrayList<>();
-              java.util.regex.Matcher pointMatcher = pointPattern.matcher(line);
-              while (pointMatcher.find()) {
-                spawnPoints.add(new SpawnPoint(
-                    Integer.parseInt(pointMatcher.group(1)),
-                    Integer.parseInt(pointMatcher.group(2)),
-                    Integer.parseInt(pointMatcher.group(3))
-                ));
-              }
-              return new SeedEntry(seed, spawnPoints);
-            } catch (NumberFormatException e) {
-              getLogger().warning("Failed to parse numbers in line: " + line);
-            }
-          } else {
-            getLogger().warning("Line does not match seed pattern: " + line);
+          try {
+            return SeedParser.parse(line);
+          } catch (IllegalArgumentException e) {
+            getLogger().warning(e.getMessage());
+            return null;
           }
-          return null;
         })
         .filter(java.util.Objects::nonNull)
         .toList();

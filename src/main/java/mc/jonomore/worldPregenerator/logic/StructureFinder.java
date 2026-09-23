@@ -64,7 +64,7 @@ public class StructureFinder {
       double distance = dx * dx + dz * dz;
       if (distance < nearestDistance) {
         nearestDistance = distance;
-        nearest = new Result(candidate.getKey().toString(), location, calculateDirection(origin, location));
+        nearest = new Result(candidate.getKey().toString(), location, direction(origin.getX(), origin.getZ(), location.getX(), location.getZ()));
       }
     }
     return nearest;
@@ -101,9 +101,12 @@ public class StructureFinder {
     return candidates;
   }
 
-  private static String calculateDirection(Location from, Location to) {
-    double deltaX = to.getX() - from.getX();
-    double deltaZ = to.getZ() - from.getZ();
+  /**
+   * Compass direction from one point to another in Minecraft coordinates (+X east, +Z south).
+   */
+  static String direction(double fromX, double fromZ, double toX, double toZ) {
+    double deltaX = toX - fromX;
+    double deltaZ = toZ - fromZ;
     double angle = Math.toDegrees(Math.atan2(deltaZ, deltaX));
     if (angle < 0) angle += 360;
     if (angle >= 337.5 || angle < 22.5) return "EAST";
