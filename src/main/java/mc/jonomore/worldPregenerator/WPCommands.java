@@ -157,9 +157,12 @@ public class WPCommands {
                     .executes(ctx -> {
                       String setting = StringArgumentType.getString(ctx, "setting");
                       String value = StringArgumentType.getString(ctx, "value");
-                      wp.getConfig().set(setting, value);
-                      wp.saveConfig();
-                      wp.config.loadConfig();
+                      try {
+                        wp.config.set(setting, value);
+                      } catch (java.io.IOException e) {
+                        wp.getLogger().log(java.util.logging.Level.SEVERE, "Failed to update config.yml", e);
+                        return 0;
+                      }
                       return Command.SINGLE_SUCCESS;
                     })
                 )

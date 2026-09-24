@@ -5,6 +5,7 @@ import mc.jonomore.worldPregenerator.generation.FailedSeedEntry;
 import mc.jonomore.worldPregenerator.generation.GenerationState;
 import mc.jonomore.worldPregenerator.generation.GenerationTask;
 import mc.jonomore.worldPregenerator.generation.SeedEntry;
+import mc.jonomore.worldPregenerator.generation.SeedParser;
 import mc.jonomore.worldPregenerator.util.FileUtils;
 import io.papermc.paper.plugin.lifecycle.event.types.LifecycleEvents;
 import org.bukkit.Bukkit;
@@ -31,6 +32,12 @@ public final class WorldPregenerator extends JavaPlugin {
     if (running) {
       getLogger().warning("Generation already running!");
       return;
+    }
+
+    // A finished task (including a completed test-one) can't be resumed; start a new one
+    if (task != null && task.isFinished()) {
+      if (task.isTestMode()) state = null;
+      task = null;
     }
 
     if (task == null) {
@@ -158,27 +165,15 @@ public final class WorldPregenerator extends JavaPlugin {
   }
 
   private List<SeedEntry> readSeeds() {
-    // Expected format: "- XXX [X, ~ Z]" where XXX is seed, X is hintX, Z is hintZ
-    // Example: "- 12345 [100, ~ 200]"
-    java.util.regex.Pattern pattern = java.util.regex.Pattern.compile("^-\\s*(-?\\d+)\\s*\\[\\s*(-?\\d+)\\s*,\\s*(?:~\\s*)?(-?\\d+)\\s*]$");
     try (java.util.stream.Stream<String> lines = Files.lines(Paths.get(config.getSeedsFile()))) {
-      return lines.map(String::trim)
-        .filter(line -> !line.isEmpty())
+      return lines.filter(line -> !line.isBlank())
         .map(line -> {
-          java.util.regex.Matcher matcher = pattern.matcher(line);
-          if (matcher.find()) {
-            try {
-              long seed = Long.parseLong(matcher.group(1));
-              int hintX = Integer.parseInt(matcher.group(2));
-              int hintZ = Integer.parseInt(matcher.group(3));
-              return new SeedEntry(seed, hintX, hintZ);
-            } catch (NumberFormatException e) {
-              getLogger().warning("Failed to parse numbers in line: " + line);
-            }
-          } else {
-            getLogger().warning("Line does not match seed pattern: " + line);
+          try {
+            return SeedParser.parse(line);
+          } catch (IllegalArgumentException e) {
+            getLogger().warning(e.getMessage());
+            return null;
           }
-          return null;
         })
         .filter(java.util.Objects::nonNull)
         .toList();
@@ -266,11 +261,11 @@ public final class WorldPregenerator extends JavaPlugin {
     SeedEntry testSeed;
 
     if (seedOverride != null) {
-      testSeed = new SeedEntry(seedOverride, 0, 0);
+      testSeed = new SeedEntry(seedOverride, List.of());
     } else if (!allSeeds.isEmpty()) {
       testSeed = allSeeds.getFirst();
     } else {
-      testSeed = new SeedEntry(42L, 0, 0);
+      testSeed = new SeedEntry(42L, List.of());
     }
 
     getLogger().info("Starting test-one for seed: " + testSeed.seed());
@@ -286,4 +281,4 @@ public final class WorldPregenerator extends JavaPlugin {
     running = true;
     task.start();
   }
-}
+}

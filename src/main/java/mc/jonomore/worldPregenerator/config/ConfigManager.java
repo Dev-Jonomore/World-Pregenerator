@@ -1,110 +1,159 @@
 package mc.jonomore.worldPregenerator.config;
 
 import mc.jonomore.worldPregenerator.WorldPregenerator;
-import org.bukkit.Material;
-import java.io.File;
+import org.spongepowered.configurate.CommentedConfigurationNode;
+import org.spongepowered.configurate.yaml.NodeStyle;
+import org.spongepowered.configurate.yaml.YamlConfigurationLoader;
 
-public class
-ConfigManager {
+import java.io.File;
+import java.io.IOException;
+import java.util.List;
+import java.util.logging.Level;
+
+public class ConfigManager {
+  /** What Chunky pregenerates: a square around the world spawn, or a rectangle around the seed's spawn points. */
+  public enum GenerationAreaMode { WORLD_SPAWN, SPAWN_POINTS }
+
   private final WorldPregenerator plugin;
+  private final YamlConfigurationLoader loader;
 
   // Cached config values
   private int generationRadius;
+  private GenerationAreaMode generationArea;
+  private int spawnPointsMargin;
   private String exportPath;
   private String serverId;
   private String seedsFile;
-  private int maxSearchRadius;
-  private int maxVerticalScan;
-  private Material cageMaterial;
-  private int cageRadius;
-  private int cageHeight;
   private long worldDelayTicks;
   private int worldsPerBatch;
   private long pauseBetweenBatches;
+  private List<String> structureFinderStructures;
+  private boolean structureFinderWhitelist;
+  private int structureFinderSearchRadius;
+  private boolean spawnVerificationEnabled;
+  private int respawnRadius;
+  private double minValidFraction;
+  private int snapRadius;
 
   public ConfigManager(WorldPregenerator plugin) {
     this.plugin = plugin;
     plugin.saveDefaultConfig();
+    this.loader = YamlConfigurationLoader.builder()
+        .path(plugin.getDataFolder().toPath().resolve("config.yml"))
+        .nodeStyle(NodeStyle.BLOCK)
+        .indent(2)
+        .build();
     loadConfig();
   }
 
+  /**
+   * Loads and validates config.yml. Missing keys fall back to the defaults in {@link PluginConfig}.
+   */
   public void loadConfig() {
-    plugin.reloadConfig();
-    
-    generationRadius = plugin.getConfig().getInt("generation-radius", 1200);
+    PluginConfig cfg;
+    try {
+      cfg = loader.load().get(PluginConfig.class);
+    } catch (IOException e) {
+      plugin.getLogger().log(Level.SEVERE, "Failed to load config.yml; using defaults", e);
+      cfg = new PluginConfig();
+    }
+
+    generationRadius = cfg.generationRadius;
     if (generationRadius < 100 || generationRadius > 10000) {
         plugin.getLogger().warning("generation-radius out of range [100,10000]: " + generationRadius + ". Defaulting to 1200.");
         generationRadius = 1200;
     }
 
-    exportPath = plugin.getConfig().getString("export-path", "exported_worlds");
-    serverId = plugin.getConfig().getString("server-id", "default");
+    try {
+        generationArea = GenerationAreaMode.valueOf(cfg.generationArea.trim().toUpperCase().replace('-', '_'));
+    } catch (IllegalArgumentException | NullPointerException e) {
+        plugin.getLogger().warning("generation-area must be world-spawn or spawn-points: " + cfg.generationArea + ". Defaulting to world-spawn.");
+        generationArea = GenerationAreaMode.WORLD_SPAWN;
+    }
+    spawnPointsMargin = cfg.spawnPointsMargin;
+    if (spawnPointsMargin < 16 || spawnPointsMargin > 2000) {
+        plugin.getLogger().warning("spawn-points-margin out of range [16,2000]: " + spawnPointsMargin + ". Defaulting to 128.");
+        spawnPointsMargin = 128;
+    }
+
+    exportPath = cfg.exportPath;
+    serverId = cfg.serverId;
     File exportDir = new File(exportPath);
     if (!exportDir.exists() && !exportDir.mkdirs()) {
         plugin.getLogger().warning("export-path directory could not be created or found: " + exportPath);
     }
 
-    seedsFile = plugin.getConfig().getString("seeds-file", "seeds.txt");
+    seedsFile = cfg.seedsFile;
     File sFile = new File(seedsFile);
     if (!sFile.exists()) {
         plugin.getLogger().warning("seeds-file does not exist: " + seedsFile);
     }
-
-    maxSearchRadius = plugin.getConfig().getInt("spawn-adjustment.maxSearchRadius", 100);
-    if (maxSearchRadius < 10 || maxSearchRadius > 256) {
-        plugin.getLogger().warning("maxSearchRadius out of range [10,256]: " + maxSearchRadius + ". Defaulting to 100.");
-        maxSearchRadius = 100;
-    }
-
-    maxVerticalScan = plugin.getConfig().getInt("spawn-adjustment.maxVerticalScan", 128);
-    if (maxVerticalScan < 10 || maxVerticalScan > 256) {
-        plugin.getLogger().warning("maxVerticalScan out of range [10,256]: " + maxVerticalScan + ". Defaulting to 128.");
-        maxVerticalScan = 128;
-    }
-
-    String cageMaterialName = plugin.getConfig().getString("cage-building.cage-material", "PURPLE_STAINED_GLASS");
-    Material parsedMaterial = Material.getMaterial(cageMaterialName);
-    if (parsedMaterial == null) {
-      plugin.getLogger().warning("Invalid cage material: '" + cageMaterialName + "'. Defaulting to 'PURPLE_STAINED_GLASS'");
-      cageMaterial = Material.PURPLE_STAINED_GLASS;
-    } else {
-      cageMaterial = parsedMaterial;
-    }
-
-    cageRadius = plugin.getConfig().getInt("cage-building.cage-radius", 4);
-    if (cageRadius < 2 || cageRadius > 10) {
-        plugin.getLogger().warning("cage-radius out of range [2,10]: " + cageRadius + ". Defaulting to 4.");
-        cageRadius = 4;
-    }
-
-    cageHeight = plugin.getConfig().getInt("cage-building.cage-height", 3);
-    if (cageHeight < 3 || cageHeight > 9 || cageHeight % 2 == 0) {
-        plugin.getLogger().warning("cage-height must be an odd number between 3-9: " + cageHeight + ". Defaulting to 3.");
-        cageHeight = 3;
-    }
     
-    worldDelayTicks = plugin.getConfig().getLong("world-delay-ticks", 40L);
+    worldDelayTicks = cfg.worldDelayTicks;
     if (worldDelayTicks < 0) {
         plugin.getLogger().warning("world-delay-ticks cannot be negative: " + worldDelayTicks + ". Defaulting to 40.");
         worldDelayTicks = 40L;
     }
 
-    worldsPerBatch = plugin.getConfig().getInt("batch-settings.worlds-per-batch", 10);
+    worldsPerBatch = cfg.batchSettings.worldsPerBatch;
     if (worldsPerBatch <= 0) {
         plugin.getLogger().warning("worlds-per-batch must be positive: " + worldsPerBatch + ". Defaulting to 10.");
         worldsPerBatch = 10;
     }
 
-    pauseBetweenBatches = plugin.getConfig().getLong("batch-settings.pause-between-batches", 60L);
+    pauseBetweenBatches = cfg.batchSettings.pauseBetweenBatches;
     if (pauseBetweenBatches < 0) {
         plugin.getLogger().warning("pause-between-batches cannot be negative: " + pauseBetweenBatches + ". Defaulting to 60.");
         pauseBetweenBatches = 60L;
     }
+
+    structureFinderStructures = List.copyOf(cfg.structureFinder.structures);
+    structureFinderWhitelist = cfg.structureFinder.whitelist;
+    structureFinderSearchRadius = cfg.structureFinder.searchRadius;
+    if (structureFinderSearchRadius < 16 || structureFinderSearchRadius > 10000) {
+        plugin.getLogger().warning("structure-finder.search-radius out of range [16,10000]: " + structureFinderSearchRadius + ". Defaulting to 200.");
+        structureFinderSearchRadius = 200;
+    }
+
+    spawnVerificationEnabled = cfg.spawnVerification.enabled;
+    respawnRadius = cfg.spawnVerification.respawnRadius;
+    // Vanilla tries at most 1024 columns, which covers the whole square only up to radius 15
+    if (respawnRadius < 0 || respawnRadius > 15) {
+        plugin.getLogger().warning("spawn-verification.respawn-radius out of range [0,15]: " + respawnRadius + ". Defaulting to 10.");
+        respawnRadius = 10;
+    }
+    minValidFraction = cfg.spawnVerification.minValidFraction;
+    if (!(minValidFraction > 0 && minValidFraction <= 1)) {
+        plugin.getLogger().warning("spawn-verification.min-valid-fraction out of range (0,1]: " + minValidFraction + ". Defaulting to 0.5.");
+        minValidFraction = 0.5;
+    }
+    snapRadius = cfg.spawnVerification.snapRadius;
+    if (snapRadius < 0 || snapRadius > 256) {
+        plugin.getLogger().warning("spawn-verification.snap-radius out of range [0,256]: " + snapRadius + ". Defaulting to 80.");
+        snapRadius = 80;
+    }
+  }
+
+  /**
+   * Sets a single value in config.yml and reloads. {@code path} is dot-separated, e.g.
+   * {@code cage-building.cage-radius}. The value is stored as a string and converted to the
+   * field's type on load. Configurate's YAML loader does not preserve comments, so saving
+   * strips them from the file.
+   */
+  public void set(String path, String value) throws IOException {
+    CommentedConfigurationNode root = loader.load();
+    root.node((Object[]) path.split("\\.")).set(value);
+    loader.save(root);
+    loadConfig();
   }
 
   public int getGenerationRadius() {
     return generationRadius;
   }
+
+  public GenerationAreaMode getGenerationArea() { return generationArea; }
+
+  public int getSpawnPointsMargin() { return spawnPointsMargin; }
 
   public String getExportPath() {
     return exportPath;
@@ -118,38 +167,46 @@ ConfigManager {
     return seedsFile;
   }
 
-  public int getMaxSearchRadius() { return maxSearchRadius; }
-
-  public int getMaxVerticalScan() { return maxVerticalScan; }
-
-  public Material getCageMaterial() { return cageMaterial; }
-
-  public int getCageRadius() { return cageRadius; }
-
-  public int getCageHeight() { return cageHeight; }
-
   public long getWorldDelayTicks() { return worldDelayTicks; }
 
   public int getWorldsPerBatch() { return worldsPerBatch; }
 
   public long getPauseBetweenBatches() { return pauseBetweenBatches; }
 
+  public List<String> getStructureFinderStructures() { return structureFinderStructures; }
+
+  public boolean isStructureFinderWhitelist() { return structureFinderWhitelist; }
+
+  public int getStructureFinderSearchRadius() { return structureFinderSearchRadius; }
+
+  public boolean isSpawnVerificationEnabled() { return spawnVerificationEnabled; }
+
+  public int getRespawnRadius() { return respawnRadius; }
+
+  public double getMinValidFraction() { return minValidFraction; }
+
+  public int getSnapRadius() { return snapRadius; }
+
   @Override
   public String toString() {
     return "generation-radius: " + generationRadius + "\n" +
+        "generation-area: " + generationArea.name().toLowerCase().replace('_', '-') + "\n" +
+        "spawn-points-margin: " + spawnPointsMargin + "\n" +
         "server-id: " + serverId + "\n" +
         "export-path: " + exportPath + "\n" +
         "seeds-file: " + seedsFile + "\n" +
-        "spawn-adjustment:\n" +
-        "  maxSearchRadius: " + maxSearchRadius + "\n" +
-        "  maxVerticalScan: " + maxVerticalScan + "\n" +
-        "cage-building:\n" +
-        "  cage-material: " + cageMaterial + "\n" +
-        "  cage-radius: " + cageRadius + "\n" +
-        "  cage-height: " + cageHeight + "\n" +
         "batch-settings:\n" +
         "  worlds-per-batch: " + worldsPerBatch + "\n" +
         "  pause-between-batches: " + pauseBetweenBatches + "\n" +
+        "structure-finder:\n" +
+        "  whitelist: " + structureFinderWhitelist + "\n" +
+        "  search-radius: " + structureFinderSearchRadius + "\n" +
+        "  structures: " + structureFinderStructures + "\n" +
+        "spawn-verification:\n" +
+        "  enabled: " + spawnVerificationEnabled + "\n" +
+        "  respawn-radius: " + respawnRadius + "\n" +
+        "  min-valid-fraction: " + minValidFraction + "\n" +
+        "  snap-radius: " + snapRadius + "\n" +
         "world-delay-ticks: " + worldDelayTicks;
   }
 }

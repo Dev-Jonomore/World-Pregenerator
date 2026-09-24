@@ -37,13 +37,14 @@ public class FileUtils {
       throw new IOException("Zip file is corrupt or invalid: " + zipPath, e);
     }
 
+    ManhuntYaml yaml;
     try {
-      ManhuntYaml YAML = ManhuntYaml.fromZip(zipPath);
-      if (YAML.directionHint() == null || YAML.overworldFolderName() == null) {
-        throw new IOException("Zip file missing critical world metadata in manhunt.yml: " + zipPath);
-      }
+      yaml = ManhuntYaml.fromZip(zipPath);
     } catch (IOException e) {
-      throw new IOException("Zip file is missing manhunt.yml: " + zipPath, e);
+      throw new IOException("Zip file has a missing or invalid manhunt.yml: " + zipPath, e);
+    }
+    if (yaml.spawnPoints() == null || yaml.spawnPoints().isEmpty()) {
+      throw new IOException("manhunt.yml has no spawn points: " + zipPath);
     }
   }
 

@@ -5,7 +5,6 @@ import com.google.gson.GsonBuilder;
 import com.google.gson.JsonDeserializer;
 import com.google.gson.JsonPrimitive;
 import com.google.gson.JsonSerializer;
-import org.bukkit.NamespacedKey;
 
 import java.io.*;
 import java.util.ArrayList;
@@ -20,7 +19,6 @@ public class GenerationState {
     private final List<FailedSeedEntry> failedSeeds = new ArrayList<>();
     private String currentStep = "IDLE";
     private String currentWorldName = null;
-    private NamespacedKey currentWorldKey = null;
     private File currentWorldFolder = null;
     private String pendingManhuntYml;
 
@@ -68,9 +66,6 @@ public class GenerationState {
 
     public String getCurrentWorldName() { return currentWorldName; }
     public void setCurrentWorldName(String currentWorldName) { this.currentWorldName = currentWorldName; }
-
-    public NamespacedKey getCurrentWorldKey() { return currentWorldKey; }
-    public void setCurrentWorldKey(NamespacedKey key) { currentWorldKey = key; }
 
     public File getCurrentWorldFolder() { return currentWorldFolder; }
     public void setCurrentWorldFolder(File currentWorldFolder) { this.currentWorldFolder = currentWorldFolder; }
