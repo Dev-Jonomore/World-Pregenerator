@@ -61,7 +61,7 @@ public class PluginConfig {
     public int respawnRadius = 10;
 
     @Setting("min-valid-fraction")
-    public double minValidFraction = 0.25;
+    public double minValidFraction = 0.5;
 
     @Setting("snap-radius")
     public int snapRadius = 80;

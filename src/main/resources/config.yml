@@ -39,8 +39,9 @@ spawn-verification:
   enabled: true
   # Must match the live servers' respawn_radius game rule (vanilla default 10). Range: 0-15
   respawn-radius: 10
-  # Share of the (2r+1)^2 columns around a point that must be valid landing spots. Range: (0, 1]
-  min-valid-fraction: 0.25
+  # Share of the (2r+1)^2 columns around a point that must be valid landing spots. Not a vanilla rule
+  # (vanilla only needs one valid column); a margin against spawns that are mostly water. Range: (0, 1]
+  min-valid-fraction: 0.5
   # How far a failing point may be moved to find a valid spot, in blocks. Points that can't be
   # fixed are dropped. 80 matches vanilla's own 5-chunk search when it picks the world spawn.
   snap-radius: 80

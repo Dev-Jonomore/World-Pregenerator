@@ -45,7 +45,7 @@ Missing keys fall back to their defaults. Note that `/wp config` rewrites the fi
 *   `spawn-verification`: Before the structure search, each spawn point is checked the way vanilla places a respawning player: it tries every column within `respawn-radius` of the world spawn and puts the player on the first one with solid, dry ground. If too few columns qualify (for example, a point in the ocean, where the player would be left floating on the water), the point is moved to the nearest spot within `snap-radius` that does. The original coordinates are kept under `verification` in `manhunt.yml`. Points that can't be fixed are dropped, and a seed with no points left is skipped and shows up in `/wp failed`.
     *   `enabled`: Whether to verify spawn points. (Default: `true`)
     *   `respawn-radius`: Must match the live servers' `respawn_radius` game rule. (Range: 0-15, Default: 10)
-    *   `min-valid-fraction`: Share of the columns around a point that must be valid landing spots. (Range: above 0 up to 1, Default: 0.25)
+    *   `min-valid-fraction`: Share of the columns around a point that must be valid landing spots. This is the verifier's own margin, not a vanilla rule: vanilla only needs one valid column. (Range: above 0 up to 1, Default: 0.5)
     *   `snap-radius`: How far a point may be moved, in blocks. (Range: 0-256, Default: 80, matching the 5-chunk search vanilla uses for its own world spawn)
     *   Players respawning in Adventure mode are placed exactly on the spawn point instead, which this check doesn't cover.
 

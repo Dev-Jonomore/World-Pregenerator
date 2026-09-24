@@ -124,8 +124,8 @@ public class ConfigManager {
     }
     minValidFraction = cfg.spawnVerification.minValidFraction;
     if (!(minValidFraction > 0 && minValidFraction <= 1)) {
-        plugin.getLogger().warning("spawn-verification.min-valid-fraction out of range (0,1]: " + minValidFraction + ". Defaulting to 0.25.");
-        minValidFraction = 0.25;
+        plugin.getLogger().warning("spawn-verification.min-valid-fraction out of range (0,1]: " + minValidFraction + ". Defaulting to 0.5.");
+        minValidFraction = 0.5;
     }
     snapRadius = cfg.spawnVerification.snapRadius;
     if (snapRadius < 0 || snapRadius > 256) {
