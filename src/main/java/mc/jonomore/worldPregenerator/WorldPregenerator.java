@@ -26,7 +26,10 @@ public final class WorldPregenerator extends JavaPlugin {
   public ConfigManager config;
   public boolean running = false;
   GenerationState state = null;
-  private GenerationTask task = null;
+  // Read from Chunky's thread by the completion listener
+  private volatile GenerationTask task = null;
+  /** The Chunky instance our single completion listener is registered with. */
+  private ChunkyAPI listenedChunky = null;
 
   public void start() {
     if (running) {
@@ -58,7 +61,7 @@ public final class WorldPregenerator extends JavaPlugin {
           return;
       }
 
-      ChunkyAPI chunky = getServer().getServicesManager().load(ChunkyAPI.class);
+      ChunkyAPI chunky = chunky();
       if (chunky == null) {
         getLogger().severe("Chunky API not found! Make sure Chunky plugin is installed.");
         return;
@@ -92,7 +95,7 @@ public final class WorldPregenerator extends JavaPlugin {
       .toList();
     getLogger().info("Retrying generation for " + failedSeeds.size() + " failed seeds.");
 
-    ChunkyAPI chunky = getServer().getServicesManager().load(ChunkyAPI.class);
+    ChunkyAPI chunky = chunky();
     if (chunky == null) {
       getLogger().severe("Chunky API not found! Make sure Chunky plugin is installed.");
       return;
@@ -251,6 +254,23 @@ public final class WorldPregenerator extends JavaPlugin {
     }
   }
 
+  /**
+   * Loads the Chunky API and makes sure our completion listener is registered with it. Chunky has
+   * no way to remove a listener, so it's registered once and forwards to whichever task is current,
+   * instead of each world adding one that lives forever.
+   */
+  private ChunkyAPI chunky() {
+    ChunkyAPI chunky = getServer().getServicesManager().load(ChunkyAPI.class);
+    if (chunky != null && chunky != listenedChunky) {
+      chunky.onGenerationComplete(event -> {
+        GenerationTask current = task;
+        if (current != null) current.onGenerationComplete(event.world());
+      });
+      listenedChunky = chunky;
+    }
+    return chunky;
+  }
+
   public void testOne(Long seedOverride) {
     if (running) {
       getLogger().warning("Generation already running!");
@@ -270,7 +290,7 @@ public final class WorldPregenerator extends JavaPlugin {
 
     getLogger().info("Starting test-one for seed: " + testSeed.seed());
 
-    ChunkyAPI chunky = getServer().getServicesManager().load(ChunkyAPI.class);
+    ChunkyAPI chunky = chunky();
     if (chunky == null) {
       getLogger().severe("Chunky API not found!");
       return;

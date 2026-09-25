@@ -12,7 +12,6 @@ import org.bukkit.*;
 import org.bukkit.scheduler.BukkitTask;
 import org.jspecify.annotations.NonNull;
 import org.popcraft.chunky.api.ChunkyAPI;
-import org.popcraft.chunky.api.event.task.GenerationCompleteEvent;
 
 import java.io.*;
 import java.nio.charset.StandardCharsets;
@@ -54,6 +53,8 @@ public class GenerationTask {
   private int retryCount = 0;
   private int worldsInCurrentBatch = 0;
   private boolean interrupted = false;
+  /** World whose Chunky task we're waiting on; set on the main thread, read from Chunky's. */
+  private volatile String awaitingWorld = null;
   private final boolean testMode;
   private BukkitTask scheduledTask = null;
 
@@ -234,23 +235,7 @@ public class GenerationTask {
     }
 
     logger.info("Step: GENERATE_CHUNKS for " + targetWorld);
-
-    // Register a fresh listener per generation call using Chunky's Consumer API.
-    // Capturing targetWorld as a final local to ensure the correct world is tracked.
-    chunky.onGenerationComplete(new java.util.function.Consumer<>() {
-      private boolean active = true;
-      @Override
-      public void accept(GenerationCompleteEvent event) {
-        if (!active || !event.world().equals(targetWorld)) return;
-        active = false; // Ensure this listener only triggers once for its target world
-
-        if (interrupted) return;
-
-        logger.info("Generation complete for " + targetWorld);
-        // Advance to the next step on the main thread
-        Bukkit.getScheduler().runTask(plugin, () -> advance(Step.PREPARE_WORLD));
-      }
-    });
+    awaitingWorld = targetWorld;
 
     Bukkit.getScheduler().runTask(plugin, () -> {
       World world = Bukkit.getWorld(targetWorld);
@@ -274,6 +259,17 @@ public class GenerationTask {
         );
       }
     });
+  }
+
+  /**
+   * Called by the plugin's single Chunky listener (see WorldPregenerator#chunky) whenever any
+   * Chunky task finishes, possibly from Chunky's own thread.
+   */
+  public void onGenerationComplete(String world) {
+    if (interrupted || !world.equals(awaitingWorld)) return;
+    awaitingWorld = null; // Only advance once per world
+    logger.info("Generation complete for " + world);
+    Bukkit.getScheduler().runTask(plugin, () -> advance(Step.PREPARE_WORLD));
   }
 
   private void handlePrepareWorld() {
