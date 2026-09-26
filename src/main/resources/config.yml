@@ -1,15 +1,48 @@
 generation-radius: 1200
+# What to pregenerate: world-spawn (a square of generation-radius around the world spawn) or
+# spawn-points (the smallest rectangle containing the seed's spawn points, plus spawn-points-margin)
+generation-area: world-spawn
+# Blocks added on each side in spawn-points mode; covers the respawn radius and snap radius
+spawn-points-margin: 128
 server-id: "server1"
 export-path: "/mnt/worlds"
 seeds-file: "/mnt/seeds/seeds.txt"
-spawn-adjustment:
-  maxSearchRadius: 100
-  maxVerticalScan: 128
-cage-building:
-  cage-material: PURPLE_STAINED_GLASS
-  cage-radius: 4
-  cage-height: 3
 batch-settings:
   worlds-per-batch: 10
   pause-between-batches: 60
+structure-finder:
+  # true: only search for the listed structures. false: search for every structure except the listed ones.
+  whitelist: true
+  # How far from each spawn point to search for its nearest structure, in blocks.
+  search-radius: 200
+  # Structure keys, e.g. village_plains or minecraft:desert_pyramid
+  structures:
+    - village_plains
+    - village_desert
+    - village_savanna
+    - village_snowy
+    - village_taiga
+    - desert_pyramid
+    - jungle_pyramid
+    - pillager_outpost
+    - shipwreck
+    - shipwreck_beached
+    - ruined_portal
+    - ruined_portal_desert
+    - ruined_portal_jungle
+    - ruined_portal_mountain
+    - ruined_portal_ocean
+    - ruined_portal_swamp
+spawn-verification:
+  # Checks each spawn point the way vanilla places respawning players (a random dry column within
+  # respawn-radius of the spawn) and moves points where too few columns qualify, e.g. in the ocean.
+  enabled: true
+  # Must match the live servers' respawn_radius game rule (vanilla default 10). Range: 0-15
+  respawn-radius: 10
+  # Share of the (2r+1)^2 columns around a point that must be valid landing spots. Not a vanilla rule
+  # (vanilla only needs one valid column); a margin against spawns that are mostly water. Range: (0, 1]
+  min-valid-fraction: 0.5
+  # How far a failing point may be moved to find a valid spot, in blocks. Points that can't be
+  # fixed are dropped. 80 matches vanilla's own 5-chunk search when it picks the world spawn.
+  snap-radius: 80
 world-delay-ticks: 40

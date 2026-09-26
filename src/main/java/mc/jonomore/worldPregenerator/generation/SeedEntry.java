@@ -1,20 +1,13 @@
 package mc.jonomore.worldPregenerator.generation;
 
+import java.util.List;
+
 /**
- * Represents a seed with its coordinate hints.
+ * Represents a seed with the spawn points available in its world.
  */
-public class SeedEntry {
-    private final long seed;
-    private final int hintX;
-    private final int hintZ;
-
-    public SeedEntry(long seed, int hintX, int hintZ) {
+public record SeedEntry(long seed, List<SpawnPoint> spawnPoints) {
+    public SeedEntry(long seed, List<SpawnPoint> spawnPoints) {
         this.seed = seed;
-        this.hintX = hintX;
-        this.hintZ = hintZ;
+        this.spawnPoints = List.copyOf(spawnPoints);
     }
-
-    public long seed() { return seed; }
-    public int hintX() { return hintX; }
-    public int hintZ() { return hintZ; }
 }
