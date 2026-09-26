@@ -210,10 +210,10 @@ public class GenerationTask {
         if (world == null) throw new RuntimeException("Failed to create world " + worldName);
 
         world.setDifficulty(Difficulty.EASY);
+        // Frozen while generating; turned back on before export. Mob spawning stays on: turning
+        // off spawn_mobs also stops the animals that chunks get once, when they're generated.
         world.setGameRule(GameRules.ADVANCE_TIME, false);
         world.setGameRule(GameRules.ADVANCE_WEATHER, false);
-        world.setGameRule(GameRules.SPAWN_MOBS, false);
-        world.setGameRule(GameRules.SPAWN_MONSTERS, false);
         state.setCurrentWorldName(world.getName());
         state.setCurrentWorldFolder(world.getWorldFolder());
 
@@ -291,6 +291,10 @@ public class GenerationTask {
 
         SeedEntry seedEntry = seeds.get(state.getCurrentIndex());
         state.setPendingManhuntYml(buildManhuntYml(world, seedEntry).toYamlString());
+
+        // The zip keeps the world's game rules, so it shouldn't ship with time and weather frozen
+        world.setGameRule(GameRules.ADVANCE_TIME, true);
+        world.setGameRule(GameRules.ADVANCE_WEATHER, true);
 
         // Save and Unload
         world.save();
