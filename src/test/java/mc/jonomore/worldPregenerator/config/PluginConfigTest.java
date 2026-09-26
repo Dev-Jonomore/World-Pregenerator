@@ -47,7 +47,6 @@ class PluginConfigTest {
     assertEquals(defaults.generationRadius, bundled.generationRadius);
     assertEquals(defaults.generationArea, bundled.generationArea);
     assertEquals(defaults.spawnPointsMargin, bundled.spawnPointsMargin);
-    assertEquals(defaults.serverId, bundled.serverId);
     assertEquals(defaults.exportPath, bundled.exportPath);
     assertEquals(defaults.seedsFile, bundled.seedsFile);
     assertEquals(defaults.worldDelayTicks, bundled.worldDelayTicks);
@@ -86,7 +85,7 @@ class PluginConfigTest {
     assertFalse(cfg.structureFinder.whitelist);
     assertEquals(List.of("mineshaft"), cfg.structureFinder.structures);
     assertEquals(new PluginConfig().structureFinder.searchRadius, cfg.structureFinder.searchRadius);
-    assertEquals(new PluginConfig().serverId, cfg.serverId);
+    assertEquals(new PluginConfig().exportPath, cfg.exportPath);
   }
 
   /** {@code /wp config} stores values as strings; they must still load into typed fields. */

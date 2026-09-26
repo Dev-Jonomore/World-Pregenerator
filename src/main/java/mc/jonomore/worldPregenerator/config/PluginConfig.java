@@ -22,9 +22,6 @@ public class PluginConfig {
   @Setting("spawn-points-margin")
   public int spawnPointsMargin = 128;
 
-  @Setting("server-id")
-  public String serverId = "server1";
-
   @Setting("export-path")
   public String exportPath = "/mnt/worlds";
 

@@ -4,7 +4,6 @@ generation-radius: 1200
 generation-area: world-spawn
 # Blocks added on each side in spawn-points mode; covers the respawn radius and snap radius
 spawn-points-margin: 128
-server-id: "server1"
 export-path: "/mnt/worlds"
 seeds-file: "/mnt/seeds/seeds.txt"
 batch-settings:

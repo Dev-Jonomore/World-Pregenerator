@@ -324,8 +324,7 @@ public class GenerationTask {
         Path exportPath = Paths.get(config.getExportPath());
         Files.createDirectories(exportPath);
 
-        String zipFileName = seedEntry.seed() + "_" + config.getServerId() + ".zip";
-        Path zipFile = exportPath.resolve(zipFileName);
+        Path zipFile = exportPath.resolve(zipName(seedEntry));
 
         // Idempotency: validate existing zip before re-zipping
         if (Files.exists(zipFile)) {
@@ -375,7 +374,7 @@ public class GenerationTask {
           zos.closeEntry();
         }
         FileUtils.verifyZip(zipFile);
-        logger.info("Successfully zipped and verified: " + zipFileName);
+        logger.info("Successfully zipped and verified: " + zipFile.getFileName());
 
         Bukkit.getScheduler().runTask(plugin, () -> advance(Step.WRITE_COMPLETED));
 
@@ -383,8 +382,7 @@ public class GenerationTask {
         // Delete partial zip on failure
         try {
           SeedEntry seedEntry = seeds.get(state.getCurrentIndex());
-          Path zipFile = Paths.get(config.getExportPath(),
-              seedEntry.seed() + "_" + config.getServerId() + ".zip");
+          Path zipFile = Paths.get(config.getExportPath(), zipName(seedEntry));
           Files.deleteIfExists(zipFile);
         } catch (Exception ignored) {}
 
@@ -434,6 +432,14 @@ public class GenerationTask {
     });
   }
 
+  /**
+   * {@code <seed>.zip}: one zip per seed across every server, and distinct from the prod pool's
+   * older {@code <seed>_<server-id>.zip} files.
+   */
+  static String zipName(SeedEntry seed) {
+    return seed.seed() + ".zip";
+  }
+
   private void handleComplete() {
     logger.info("Step: COMPLETE for seed index " + state.getCurrentIndex());
 
@@ -441,7 +447,7 @@ public class GenerationTask {
       long totalTime = System.currentTimeMillis() - state.getStartTime();
       SeedEntry seed = seeds.getFirst();
       World world = Bukkit.getWorld(state.getCurrentWorldName());
-      Path zipFile = Paths.get(config.getExportPath(), seed.seed() + "_" + config.getServerId() + ".zip");
+      Path zipFile = Paths.get(config.getExportPath(), zipName(seed));
 
       logger.info("=== test-one results ===");
       logger.info("Seed: " + seed.seed());

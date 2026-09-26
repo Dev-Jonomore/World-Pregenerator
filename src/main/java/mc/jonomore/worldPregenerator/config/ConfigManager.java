@@ -22,7 +22,6 @@ public class ConfigManager {
   private GenerationAreaMode generationArea;
   private int spawnPointsMargin;
   private String exportPath;
-  private String serverId;
   private String seedsFile;
   private long worldDelayTicks;
   private int worldsPerBatch;
@@ -77,7 +76,6 @@ public class ConfigManager {
     }
 
     exportPath = cfg.exportPath;
-    serverId = cfg.serverId;
     File exportDir = new File(exportPath);
     if (!exportDir.exists() && !exportDir.mkdirs()) {
         plugin.getLogger().warning("export-path directory could not be created or found: " + exportPath);
@@ -159,10 +157,6 @@ public class ConfigManager {
     return exportPath;
   }
 
-  public String getServerId() {
-    return serverId;
-  }
-
   public String getSeedsFile() {
     return seedsFile;
   }
@@ -192,7 +186,6 @@ public class ConfigManager {
     return "generation-radius: " + generationRadius + "\n" +
         "generation-area: " + generationArea.name().toLowerCase().replace('_', '-') + "\n" +
         "spawn-points-margin: " + spawnPointsMargin + "\n" +
-        "server-id: " + serverId + "\n" +
         "export-path: " + exportPath + "\n" +
         "seeds-file: " + seedsFile + "\n" +
         "batch-settings:\n" +
