@@ -4,8 +4,12 @@ generation-radius: 1200
 generation-area: world-spawn
 # Blocks added on each side in spawn-points mode; covers the respawn radius and snap radius
 spawn-points-margin: 128
+# Where the exported <seed>.zip files are written. Created if it does not exist.
 export-path: "/mnt/worlds"
+# Seeds file: one line per seed, seed/x1,y1,z1/x2,y2,z2/... (at least one spawn point).
+# Only re-read when a new run starts, not while one is in progress.
 seeds-file: "/mnt/seeds/seeds.txt"
+# Pause for pause-between-batches seconds after every worlds-per-batch worlds.
 batch-settings:
   worlds-per-batch: 10
   pause-between-batches: 60
@@ -44,4 +48,5 @@ spawn-verification:
   # How far a failing point may be moved to find a valid spot, in blocks. Points that can't be
   # fixed are dropped. 80 matches vanilla's own 5-chunk search when it picks the world spawn.
   snap-radius: 80
+# Idle delay between worlds, in ticks. Runs after cleanup finishes, so 0 is safe.
 world-delay-ticks: 40
