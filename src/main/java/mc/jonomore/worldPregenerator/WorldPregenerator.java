@@ -72,7 +72,7 @@ public final class WorldPregenerator extends JavaPlugin {
       }
 
       state.setCurrentIndex(0);
-      task = new GenerationTask(this, seedsToProcess, completedSeeds, chunky, state, false);
+      task = new GenerationTask(this, seedsToProcess, completedSeeds, chunky, state, false, config.isSeedListWatch());
     }
 
     running = true;
@@ -111,7 +111,8 @@ public final class WorldPregenerator extends JavaPlugin {
     state.setStartTime(System.currentTimeMillis());
     state.setCurrentStep("RETRYING_FAILED");
 
-    task = new GenerationTask(this, failedSeeds, completedSeeds, chunky, state, false);
+    // A retry works through a fixed list of past failures; new seeds are not folded into it
+    task = new GenerationTask(this, failedSeeds, completedSeeds, chunky, state, false, false);
     running = true;
     task.start();
   }
@@ -168,6 +169,22 @@ public final class WorldPregenerator extends JavaPlugin {
   }
 
   private List<SeedEntry> readSeeds() {
+    try {
+      return readSeedsChecked();
+    } catch (IOException e) {
+      getLogger().severe("Error reading seeds: " + e.getMessage());
+      return Collections.emptyList();
+    }
+  }
+
+  /**
+   * Reads and parses the seeds file. Unparseable lines are logged and skipped, but an IO failure
+   * is thrown rather than reported as an empty file: a caller refreshing a live queue has to be
+   * able to tell "no new seeds" from "couldn't read the file".
+   *
+   * @throws IOException if the seeds file can't be read
+   */
+  public List<SeedEntry> readSeedsChecked() throws IOException {
     try (java.util.stream.Stream<String> lines = Files.lines(Paths.get(config.getSeedsFile()))) {
       return lines.filter(line -> !line.isBlank())
         .map(line -> {
@@ -180,9 +197,6 @@ public final class WorldPregenerator extends JavaPlugin {
         })
         .filter(java.util.Objects::nonNull)
         .toList();
-    } catch (IOException e) {
-      getLogger().severe("Error reading seeds: " + e.getMessage());
-      return Collections.emptyList();
     }
   }
 
@@ -297,7 +311,7 @@ public final class WorldPregenerator extends JavaPlugin {
     }
 
     state = new GenerationState();
-    task = new GenerationTask(this, List.of(testSeed), new java.util.HashSet<>(), chunky, state, true);
+    task = new GenerationTask(this, List.of(testSeed), new java.util.HashSet<>(), chunky, state, true, false);
     running = true;
     task.start();
   }

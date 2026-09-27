@@ -13,6 +13,13 @@ seeds-file: "/mnt/seeds/seeds.txt"
 batch-settings:
   worlds-per-batch: 10
   pause-between-batches: 60
+# The seeds file can be appended to while a run is going.
+seed-list:
+  # Pick up seeds added to the file between worlds, without a restart.
+  watch: true
+  # When the queue empties: 0 ends the run, any other value keeps the run alive and re-checks
+  # the file this often (seconds), so a feeder can keep topping it up. /wp stop ends the wait.
+  idle-poll-seconds: 0
 structure-finder:
   # true: only search for the listed structures. false: search for every structure except the listed ones.
   whitelist: true

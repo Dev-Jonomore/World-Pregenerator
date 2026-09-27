@@ -47,9 +47,38 @@ run. Choosing good candidate points is the job of whatever produces this file; t
 validates that a player can actually land on them (see
 [Spawn verification](#spawn-verification)).
 
-> The seeds file is read when a new generation task is created — on `/wp start` with no task in
-> progress. Editing it mid-run has no effect until the current task finishes or the server
-> restarts.
+### Adding seeds to a live run
+
+The seeds file is a running list. With `seed-list.watch` on (the default), it is re-read between
+worlds and anything new is appended to the queue, so a feeder can top it up while generation is
+going — no restart, no `/wp stop`.
+
+The refresh only ever **appends**:
+
+* A seed already queued is ignored, matched by seed value. Re-listing one with different spawn
+  points does not queue it twice, since there is one zip per seed.
+* A seed in `completed.txt` is ignored, so re-listing finished work does not regenerate it.
+* Removing lines from the file retracts nothing. Seeds already queued still run; use `/wp stop`
+  to end a run early.
+* If the file can't be read, the queue is left alone and the run continues — a transient IO
+  error on a network mount won't end a campaign.
+
+By default the run still ends when the queue drains. Set `seed-list.idle-poll-seconds` to keep it
+alive instead: the run stays open and re-checks the file that often, picking up seeds as they
+arrive. `/wp status` reports `WAITING_FOR_SEEDS` while it waits, and `/wp stop` ends it.
+
+```yaml
+seed-list:
+  watch: true
+  idle-poll-seconds: 30
+```
+
+That turns a pregeneration server into a worker that drains a queue someone else fills, rather
+than one that has to be handed a list and restarted.
+
+Two limits worth knowing: `/wp retry` works through a fixed list of past failures and does not
+take new seeds, and a run that is waiting counts as running, so `/wp start` answers "Generation
+already running!" until you stop it.
 
 ## What it produces
 
@@ -166,6 +195,13 @@ Any key you leave out falls back to its default.
 * `world-delay-ticks` — idle delay between worlds, default `40` (2 seconds). The delay runs after
   cleanup has finished and each world gets a fresh name, so `0` is safe and saves real time over
   a large run.
+
+### Seed list
+
+* `seed-list.watch` — re-read the seeds file between worlds and append new seeds to a live run.
+  Default `true`.
+* `seed-list.idle-poll-seconds` — what to do when the queue drains. `0` (default) ends the run as
+  before. Any other value keeps the run open and re-checks the file that often, in seconds.
 
 ### Batching
 

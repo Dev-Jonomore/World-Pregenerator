@@ -84,7 +84,7 @@ public class WPCommands {
 
                 ctx.getSource().getSender().sendMessage(MiniMessage.miniMessage().deserialize(
                     "<gold>=== WorldPregenerator Status ===<newline>" +
-                    "<gray>Step: <white>" + state.getCurrentStep() + "<newline>" +
+                    "<gray>Step: <white>" + (state.isWaitingForSeeds() ? "WAITING_FOR_SEEDS" : state.getCurrentStep()) + "<newline>" +
                     "<gray>Progress: <white>" + state.getCurrentIndex() + "/" + state.getTotalSeeds() + " (" + progress + ")<newline>" +
                     "<gray>Success: <green>" + state.getSuccessCount() + "<newline>" +
                     "<gray>Failure: <red>" + state.getFailureCount() + "<newline>" +

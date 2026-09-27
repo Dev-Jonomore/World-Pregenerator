@@ -26,6 +26,8 @@ public class ConfigManager {
   private long worldDelayTicks;
   private int worldsPerBatch;
   private long pauseBetweenBatches;
+  private boolean seedListWatch;
+  private long seedListIdlePollSeconds;
   private List<String> structureFinderStructures;
   private boolean structureFinderWhitelist;
   private int structureFinderSearchRadius;
@@ -105,6 +107,13 @@ public class ConfigManager {
         pauseBetweenBatches = 60L;
     }
 
+    seedListWatch = cfg.seedList.watch;
+    seedListIdlePollSeconds = cfg.seedList.idlePollSeconds;
+    if (seedListIdlePollSeconds < 0) {
+        plugin.getLogger().warning("seed-list.idle-poll-seconds cannot be negative: " + seedListIdlePollSeconds + ". Defaulting to 0 (finish when the queue empties).");
+        seedListIdlePollSeconds = 0L;
+    }
+
     structureFinderStructures = List.copyOf(cfg.structureFinder.structures);
     structureFinderWhitelist = cfg.structureFinder.whitelist;
     structureFinderSearchRadius = cfg.structureFinder.searchRadius;
@@ -167,6 +176,11 @@ public class ConfigManager {
 
   public long getPauseBetweenBatches() { return pauseBetweenBatches; }
 
+  public boolean isSeedListWatch() { return seedListWatch; }
+
+  /** 0 means finish when the queue empties instead of waiting for more seeds. */
+  public long getSeedListIdlePollSeconds() { return seedListIdlePollSeconds; }
+
   public List<String> getStructureFinderStructures() { return structureFinderStructures; }
 
   public boolean isStructureFinderWhitelist() { return structureFinderWhitelist; }
@@ -191,6 +205,9 @@ public class ConfigManager {
         "batch-settings:\n" +
         "  worlds-per-batch: " + worldsPerBatch + "\n" +
         "  pause-between-batches: " + pauseBetweenBatches + "\n" +
+        "seed-list:\n" +
+        "  watch: " + seedListWatch + "\n" +
+        "  idle-poll-seconds: " + seedListIdlePollSeconds + "\n" +
         "structure-finder:\n" +
         "  whitelist: " + structureFinderWhitelist + "\n" +
         "  search-radius: " + structureFinderSearchRadius + "\n" +

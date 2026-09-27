@@ -21,6 +21,8 @@ public class GenerationState {
     private String currentWorldName = null;
     private File currentWorldFolder = null;
     private String pendingManhuntYml;
+    /** True while the queue is drained and the task is polling the seeds file for more. */
+    private boolean waitingForSeeds = false;
 
     private static final Gson GSON = new GsonBuilder()
             .registerTypeAdapter(File.class, (JsonSerializer<File>) (src, _, _) -> new JsonPrimitive(src.getPath()))
@@ -72,6 +74,9 @@ public class GenerationState {
 
     public String getPendingManhuntYml() { return pendingManhuntYml; }
     public void setPendingManhuntYml(String mYaml) { this.pendingManhuntYml = mYaml; }
+
+    public boolean isWaitingForSeeds() { return waitingForSeeds; }
+    public void setWaitingForSeeds(boolean waitingForSeeds) { this.waitingForSeeds = waitingForSeeds; }
 
     public double getProgress() {
         if (totalSeeds == 0) return 0;

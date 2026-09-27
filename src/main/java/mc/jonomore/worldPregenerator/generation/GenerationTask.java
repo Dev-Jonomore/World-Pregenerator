@@ -18,8 +18,10 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.function.IntConsumer;
 import java.util.logging.Level;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
@@ -40,6 +42,7 @@ public class GenerationTask {
   private final WorldPregenerator plugin;
   private final java.util.logging.Logger logger;
   private final ConfigManager config;
+  /** Append-only: indices already consumed must stay put so a resumed run keeps its place. */
   private final List<SeedEntry> seeds;
   private final Set<Long> completedSeeds;
   private final ChunkyAPI chunky;
@@ -56,6 +59,8 @@ public class GenerationTask {
   /** World whose Chunky task we're waiting on; set on the main thread, read from Chunky's. */
   private volatile String awaitingWorld = null;
   private final boolean testMode;
+  /** Whether to fold seeds appended to the seeds file into this run as it goes. */
+  private final boolean watchSeeds;
   private BukkitTask scheduledTask = null;
 
   public GenerationTask(
@@ -64,12 +69,13 @@ public class GenerationTask {
       Set<Long> completedSeeds,
       ChunkyAPI chunky,
       GenerationState state,
-      boolean testMode
+      boolean testMode,
+      boolean watchSeeds
   ) {
     this.plugin = plugin;
     config = plugin.config;
     logger = plugin.getLogger();
-    this.seeds = seeds;
+    this.seeds = new ArrayList<>(seeds);
     this.completedSeeds = completedSeeds;
     this.state = state;
     stateFile = new File(plugin.getDataFolder(), GenerationConstants.STATE_FILE_NAME);
@@ -85,8 +91,9 @@ public class GenerationTask {
         config.isStructureFinderWhitelist(),
         config.getStructureFinderSearchRadius()
     );
-    this.state.setTotalSeeds(seeds.size());
+    this.state.setTotalSeeds(this.seeds.size());
     this.testMode = testMode;
+    this.watchSeeds = watchSeeds;
 
     // Ensure starting step is set if it's IDLE or invalid
     if (state.getCurrentStep() == null || "IDLE".equals(state.getCurrentStep())) {
@@ -121,6 +128,7 @@ public class GenerationTask {
 
   public void stop() {
     interrupted = true;
+    state.setWaitingForSeeds(false);
     if (scheduledTask != null) {
       scheduledTask.cancel();
       scheduledTask = null;
@@ -138,9 +146,16 @@ public class GenerationTask {
       String worldName = state.getCurrentWorldName();
       World world = Bukkit.getWorld(worldName);
       if (world != null) Bukkit.unloadWorld(world, false);
-      Path worldFolder = state.getCurrentWorldFolder().toPath();
-      if (Files.exists(worldFolder)) {
-        FileUtils.deleteDirectoryWithRetry(worldFolder, logger, null);
+      // Guarded separately from the name: Gson leaves a field absent from state.json null without
+      // complaining, so a state file written by an older version can carry a name and no folder
+      File folder = state.getCurrentWorldFolder();
+      if (folder == null) {
+        logger.warning("No world folder recorded for " + worldName + "; skipping its deletion.");
+      } else {
+        Path worldFolder = folder.toPath();
+        if (Files.exists(worldFolder)) {
+          FileUtils.deleteDirectoryWithRetry(worldFolder, logger, null);
+        }
       }
     }
     state.setCurrentIndex(0);
@@ -159,10 +174,7 @@ public class GenerationTask {
     if (interrupted) return;
 
     if (state.getCurrentIndex() >= seeds.size()) {
-      logger.info("All seeds processed!");
-      plugin.running = false;
-      state.setCurrentStep("COMPLETED");
-      saveState();
+      onQueueExhausted();
       return;
     }
 
@@ -486,10 +498,7 @@ public class GenerationTask {
 
 
     if (state.getCurrentIndex() >= seeds.size()) {
-      logger.info("All worlds generated successfully!");
-      plugin.running = false;
-      state.setCurrentStep("COMPLETED");
-      saveState();
+      onQueueExhausted();
       return;
     }
 
@@ -502,7 +511,116 @@ public class GenerationTask {
       delay = config.getWorldDelayTicks();
     }
 
-    scheduledTask = Bukkit.getScheduler().runTaskLater(plugin, this::dispatch, delay);
+    scheduledTask = Bukkit.getScheduler().runTaskLater(plugin, this::refreshThenDispatch, delay);
+  }
+
+  /**
+   * New seeds from a re-read of the seeds file: the ones not already queued and not already
+   * exported. Seeds are matched by value, so re-listing a seed with different spawn points does
+   * not queue it again, and a seed repeated within the file is only taken once.
+   */
+  static List<SeedEntry> newSeeds(List<SeedEntry> queued, Set<Long> completed, List<SeedEntry> fresh) {
+    Set<Long> known = new HashSet<>(completed);
+    for (SeedEntry entry : queued) known.add(entry.seed());
+
+    List<SeedEntry> added = new ArrayList<>();
+    for (SeedEntry entry : fresh) {
+      if (known.add(entry.seed())) added.add(entry);
+    }
+    return added;
+  }
+
+  /**
+   * Re-reads the seeds file off the main thread and appends whatever is new to the queue, then
+   * hands the number appended to {@code then} on the main thread. An unreadable file is treated
+   * as "nothing new" rather than as an empty list, so a transient IO error can't end a run.
+   */
+  private void refreshSeeds(IntConsumer then) {
+    Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
+      List<SeedEntry> fresh;
+      try {
+        fresh = plugin.readSeedsChecked();
+      } catch (IOException e) {
+        logger.warning("Could not re-read the seeds file, keeping the current queue: " + e.getMessage());
+        Bukkit.getScheduler().runTask(plugin, () -> then.accept(0));
+        return;
+      }
+
+      Bukkit.getScheduler().runTask(plugin, () -> {
+        if (interrupted) return;
+        List<SeedEntry> added;
+        // completedSeeds is mutated from the async WRITE_COMPLETED step
+        synchronized (completedSeeds) {
+          added = newSeeds(seeds, completedSeeds, fresh);
+        }
+        if (!added.isEmpty()) {
+          seeds.addAll(added);
+          state.setTotalSeeds(seeds.size());
+        }
+        then.accept(added.size());
+      });
+    });
+  }
+
+  /** Between worlds: pick up anything appended to the seeds file, then run the next seed. */
+  private void refreshThenDispatch() {
+    if (interrupted) return;
+    if (!watchSeeds) {
+      dispatch();
+      return;
+    }
+    refreshSeeds(added -> {
+      if (added > 0) {
+        logger.info("Picked up " + added + " new seed(s) from the seeds file (" + seeds.size() + " queued).");
+        saveState();
+      }
+      dispatch();
+    });
+  }
+
+  /**
+   * The queue is drained. Depending on config this ends the run, or re-reads the seeds file and
+   * keeps waiting for more to be appended.
+   */
+  private void onQueueExhausted() {
+    if (interrupted) return;
+    if (!watchSeeds) {
+      finishRun();
+      return;
+    }
+
+    refreshSeeds(added -> {
+      if (interrupted) return;
+      if (added > 0) {
+        logger.info("Picked up " + added + " new seed(s) from the seeds file (" + seeds.size() + " queued).");
+        state.setWaitingForSeeds(false);
+        saveState();
+        dispatch();
+        return;
+      }
+
+      long pollSeconds = config.getSeedListIdlePollSeconds();
+      if (pollSeconds <= 0) {
+        finishRun();
+        return;
+      }
+
+      if (!state.isWaitingForSeeds()) {
+        state.setWaitingForSeeds(true);
+        logger.info("Seed list drained. Watching " + config.getSeedsFile()
+            + " for more seeds every " + pollSeconds + "s. /wp stop to end the run.");
+        saveState();
+      }
+      scheduledTask = Bukkit.getScheduler().runTaskLater(plugin, this::onQueueExhausted, pollSeconds * 20L);
+    });
+  }
+
+  private void finishRun() {
+    logger.info("All worlds generated successfully!");
+    plugin.running = false;
+    state.setWaitingForSeeds(false);
+    state.setCurrentStep("COMPLETED");
+    saveState();
   }
 
   private void handleError(Exception e) {

@@ -31,6 +31,9 @@ public class PluginConfig {
   @Setting("batch-settings")
   public BatchSettings batchSettings = new BatchSettings();
 
+  @Setting("seed-list")
+  public SeedList seedList = new SeedList();
+
   @Setting("structure-finder")
   public StructureFinder structureFinder = new StructureFinder();
 
@@ -39,6 +42,15 @@ public class PluginConfig {
 
   @Setting("world-delay-ticks")
   public long worldDelayTicks = 40L;
+
+  @ConfigSerializable
+  public static class SeedList {
+    @Setting("watch")
+    public boolean watch = true;
+
+    @Setting("idle-poll-seconds")
+    public long idlePollSeconds = 0L;
+  }
 
   @ConfigSerializable
   public static class BatchSettings {
